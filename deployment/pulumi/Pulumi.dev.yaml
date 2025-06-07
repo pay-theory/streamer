@@ -1,0 +1,9 @@
+config:
+  aws:region: us-east-1
+  streamer:environment: dev
+  streamer:lambdaMemorySize: 3008  # More CPU = faster execution = lower cost
+  streamer:lambdaTimeout: 30
+  streamer:reservedConcurrency: 10
+  streamer:logRetentionDays: 7
+  streamer:jwtIssuer: https://auth-dev.pay-theory.com
+  streamer:allowedTenants: ""  # Allow all tenants in dev 

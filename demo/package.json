@@ -1,0 +1,16 @@
+{
+  "name": "streamer-demo-client",
+  "version": "1.0.0",
+  "description": "Demo WebSocket client for Streamer async processing system",
+  "main": "client.js",
+  "scripts": {
+    "start": "node client.js",
+    "demo": "CONNECTION_ID=${CONNECTION_ID} WS_URL=${WS_URL} node client.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 

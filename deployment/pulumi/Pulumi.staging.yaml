@@ -1,0 +1,9 @@
+config:
+  aws:region: us-east-1
+  streamer:environment: staging
+  streamer:lambdaMemorySize: 3008  # More CPU = faster execution = lower cost
+  streamer:lambdaTimeout: 30
+  streamer:reservedConcurrency: 50
+  streamer:logRetentionDays: 30
+  streamer:jwtIssuer: https://auth-staging.pay-theory.com
+  streamer:allowedTenants: ""  # Configure specific tenants if needed 

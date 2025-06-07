@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Streamer WebSocket Lambda Functions
+
+Parameters:
+  TablePrefix:
+    Type: String
+    Default: streamer_
+    Description: Prefix for DynamoDB table names
+  JWTSecret:
+    Type: String
+    NoEcho: true
+    Description: Secret for JWT validation
+  Stage:
+    Type: String
+    Default: prod
+    Description: Deployment stage
+
+Globals:
+  Function:
+    Runtime: go1.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_PREFIX: !Ref TablePrefix
+        SERVICE_NAME: streamer
+    Tracing: Active
+
+Resources:
+  # WebSocket API
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: StreamerWebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+
+  # Connect Route
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      OperationName: ConnectRoute
+      Target: !Sub integrations/${ConnectIntegration}
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectFunction.Arn}/invocations
+
+  ConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-connect
+      CodeUri: connect/
+      Handler: main
+      Environment:
+        Variables:
+          JWT_SECRET: !Ref JWTSecret
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub ${TablePrefix}connections
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+              Resource: '*'
+
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ConnectFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*
+
+  # Disconnect Route
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Sub integrations/${DisconnectIntegration}
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectFunction.Arn}/invocations
+
+  DisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-disconnect
+      CodeUri: disconnect/
+      Handler: main
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub ${TablePrefix}connections
+        - DynamoDBCrudPolicy:
+            TableName: !Sub ${TablePrefix}subscriptions
+        - Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+              Resource: '*'
+
+  DisconnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DisconnectFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*
+
+  # Default Route (for router - handled by Team 2)
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      OperationName: DefaultRoute
+      Target: !Sub integrations/${DefaultIntegration}
+
+  DefaultIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations
+
+  # Placeholder for Router Function (Team 2 will implement)
+  RouterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-router
+      CodeUri: router/
+      Handler: main
+      Environment:
+        Variables:
+          WEBSOCKET_ENDPOINT: !Sub https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub ${TablePrefix}connections
+        - DynamoDBCrudPolicy:
+            TableName: !Sub ${TablePrefix}requests
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  RouterPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RouterFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*
+
+  # Deployment
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - DefaultRoute
+    Properties:
+      ApiId: !Ref WebSocketApi
+
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: !Ref Stage
+      DeploymentId: !Ref Deployment
+      DefaultRouteSettings:
+        LoggingLevel: INFO
+        DataTraceEnabled: true
+        DetailedMetricsEnabled: true
+        ThrottlingBurstLimit: 5000
+        ThrottlingRateLimit: 10000
+
+  # CloudWatch Log Group for API Gateway
+  ApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/apigateway/${WebSocketApi}
+      RetentionInDays: 7
+
+Outputs:
+  WebSocketURL:
+    Description: WebSocket URL
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  
+  ConnectFunctionArn:
+    Description: Connect Lambda Function ARN
+    Value: !GetAtt ConnectFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ConnectFunctionArn
+  
+  DisconnectFunctionArn:
+    Description: Disconnect Lambda Function ARN
+    Value: !GetAtt DisconnectFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-DisconnectFunctionArn
+  
+  RouterFunctionArn:
+    Description: Router Lambda Function ARN
+    Value: !GetAtt RouterFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-RouterFunctionArn
+  
+  WebSocketApiId:
+    Description: WebSocket API ID
+    Value: !Ref WebSocketApi
+    Export:
+      Name: !Sub ${AWS::StackName}-WebSocketApiId 

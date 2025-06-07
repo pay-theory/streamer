@@ -1,0 +1,3 @@
+name: streamer
+runtime: go
+description: Real-time WebSocket communication infrastructure for Streamer 
