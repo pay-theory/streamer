@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.2
 	github.com/aws/aws-xray-sdk-go v1.8.5
 	github.com/aws/smithy-go v1.22.2
-	github.com/golang-jwt/jwt/v5 v5.2.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0
 )
