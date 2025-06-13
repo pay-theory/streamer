@@ -1,0 +1,24 @@
+{
+  "timestamp": "20250613_145714",
+  "code_metrics": {
+    "files": 85,
+    "lines_of_code": 21019,
+    "comments": 2071,
+    "blank_lines": 3478,
+    "total_lines": 26568
+  },
+  "test_metrics": {
+    "coverage_percentage": 67.1
+  },
+  "dependency_metrics": {
+    "direct": 78,
+    "indirect": 0
+  },
+  "bundle_sizes": {
+    "connect": 13.63,
+    "disconnect": 13.58,
+    "router": 9.31,
+    "processor": 9.15
+  },
+  "boilerplate_indicators": {}
+}

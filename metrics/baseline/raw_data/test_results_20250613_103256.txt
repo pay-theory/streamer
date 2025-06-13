@@ -1,0 +1,46 @@
+	github.com/pay-theory/streamer/demo		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/lambda/processor		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/internal/protocol	0.885s	coverage: 98.6% of statements
+ok  	github.com/pay-theory/streamer/internal/store	1.554s	coverage: 80.8% of statements
+ok  	github.com/pay-theory/streamer/internal/store/dynamorm	1.563s	coverage: 84.0% of statements
+	github.com/pay-theory/streamer/metrics/baseline/scripts		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/connect	3.948s	coverage: 65.2% of statements
+ok  	github.com/pay-theory/streamer/lambda/disconnect	3.072s	coverage: 70.1% of statements
+	github.com/pay-theory/streamer/scripts		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/scripts/demo		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/executor	7.138s	coverage: 90.1% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/handlers	40.096s	coverage: 62.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/router	2.381s	coverage: 53.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/shared	1.783s	coverage: 54.7% of statements
+ok  	github.com/pay-theory/streamer/pkg/connection	5.648s	coverage: 67.8% of statements
+--- FAIL: TestBatcherShutdownTimeout (0.00s)
+    batcher_test.go:316: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:316
+        	Error:      	An error is expected but got nil.
+        	Test:       	TestBatcherShutdownTimeout
+    batcher_test.go:317: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:317
+        	Error:      	Not equal: 
+        	            	expected: context.deadlineExceededError(context.deadlineExceededError{})
+        	            	actual  : <nil>(<nil>)
+        	Test:       	TestBatcherShutdownTimeout
+2025/06/13 10:33:08 [Progress] Sending update for request req123: 25% - Quarter done
+2025/06/13 10:33:08 [Progress] Sending update for request req123: 50% - Processing halfway
+2025/06/13 10:33:08 [Progress] Connection conn456 no longer active for request req123
+2025/06/13 10:33:08 [Progress] Sending update for request req123: 75% - Almost done
+2025/06/13 10:33:08 [Progress] Failed to send update for request req123: send failed
+2025/06/13 10:33:08 [Progress] Sending update for request req123: 100% - Complete
+2025/06/13 10:33:08 [Progress] Sending update for request req123: 10% - Starting
+2025/06/13 10:33:09 [Progress] Sending update for request req123: 30% - More progress
+2025/06/13 10:33:09 [Progress] Sending update for request req123: 50% - With metadata
+2025/06/13 10:33:09 [Progress] Sending update for request req123: 50% - Halfway
+2025/06/13 10:33:09 [Progress] Sending update for request req123: 40% - Progress
+FAIL
+coverage: 96.7% of statements
+FAIL	github.com/pay-theory/streamer/pkg/progress	1.771s
+ok  	github.com/pay-theory/streamer/pkg/streamer	1.095s	coverage: 97.8% of statements
+ok  	github.com/pay-theory/streamer/pkg/types	0.739s	coverage: 100.0% of statements
+ok  	github.com/pay-theory/streamer/tests/integration	2.155s	coverage: [no statements]
+ok  	github.com/pay-theory/streamer/tests/performance	0.658s	coverage: [no statements] [no tests to run]
+ok  	github.com/pay-theory/streamer/tests/unit	0.524s	coverage: [no statements]
+FAIL

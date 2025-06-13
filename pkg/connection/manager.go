@@ -10,8 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi/types"
 	"github.com/pay-theory/streamer/internal/store"
 )
@@ -41,7 +39,7 @@ type CircuitBreaker struct {
 // Manager handles WebSocket connections through API Gateway
 type Manager struct {
 	store      store.ConnectionStore
-	apiGateway *apigatewaymanagementapi.Client
+	apiGateway APIGatewayClient
 	endpoint   string
 
 	// Production features
@@ -56,7 +54,7 @@ type Manager struct {
 }
 
 // NewManager creates a new connection manager
-func NewManager(store store.ConnectionStore, apiGateway *apigatewaymanagementapi.Client, endpoint string) *Manager {
+func NewManager(store store.ConnectionStore, apiGateway APIGatewayClient, endpoint string) *Manager {
 	m := &Manager{
 		store:      store,
 		apiGateway: apiGateway,
@@ -77,7 +75,7 @@ func NewManager(store store.ConnectionStore, apiGateway *apigatewaymanagementapi
 	}
 
 	// Initialize error counters
-	errorTypes := []string{"connection_not_found", "connection_stale", "marshal_error", "network_error", "timeout"}
+	errorTypes := []string{"connection_not_found", "connection_stale", "marshal_error", "network_error", "timeout", "circuit_open"}
 	for _, errType := range errorTypes {
 		m.metrics.ErrorsByType[errType] = &atomic.Int64{}
 	}
@@ -336,12 +334,20 @@ func (m *Manager) sendWithRetry(ctx context.Context, connectionID string, data [
 
 		lastErr = err
 
-		// Don't retry on 4xx errors (except 429)
-		var clientErr interface{ HTTPStatusCode() int }
-		if errors.As(err, &clientErr) {
-			statusCode := clientErr.HTTPStatusCode()
-			if statusCode >= 400 && statusCode < 500 && statusCode != 429 {
+		// Check if error is retryable using our interface
+		var apiErr APIError
+		if errors.As(err, &apiErr) {
+			if !apiErr.IsRetryable() {
 				return err
+			}
+		} else {
+			// Fallback to checking HTTP status codes for legacy AWS SDK errors
+			var clientErr interface{ HTTPStatusCode() int }
+			if errors.As(err, &clientErr) {
+				statusCode := clientErr.HTTPStatusCode()
+				if statusCode >= 400 && statusCode < 500 && statusCode != 429 {
+					return err
+				}
 			}
 		}
 
@@ -372,13 +378,7 @@ func (m *Manager) sendWithRetry(ctx context.Context, connectionID string, data [
 
 // sendMessage sends a single message to a connection
 func (m *Manager) sendMessage(ctx context.Context, connectionID string, data []byte) error {
-	input := &apigatewaymanagementapi.PostToConnectionInput{
-		ConnectionId: aws.String(connectionID),
-		Data:         data,
-	}
-
-	_, err := m.apiGateway.PostToConnection(ctx, input)
-	return err
+	return m.apiGateway.PostToConnection(ctx, connectionID, data)
 }
 
 // isConnectionGone checks if the error indicates a 410 Gone status
@@ -387,15 +387,27 @@ func isConnectionGone(err error) bool {
 		return false
 	}
 
-	// Check for GoneException type
-	var goneErr *types.GoneException
+	// Check for our GoneError type
+	var goneErr GoneError
 	if errors.As(err, &goneErr) {
 		return true
 	}
 
+	// Check for GoneException type (AWS SDK)
+	var goneException *types.GoneException
+	if errors.As(err, &goneException) {
+		return true
+	}
+
 	// Also check for HTTP status code in error response
-	var apiErr interface{ HTTPStatusCode() int }
+	var apiErr APIError
 	if errors.As(err, &apiErr) && apiErr.HTTPStatusCode() == 410 {
+		return true
+	}
+
+	// Legacy check for AWS SDK errors
+	var sdkErr interface{ HTTPStatusCode() int }
+	if errors.As(err, &sdkErr) && sdkErr.HTTPStatusCode() == 410 {
 		return true
 	}
 

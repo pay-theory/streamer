@@ -1,0 +1,33 @@
+=== Local Performance Benchmarks ===
+Timestamp: 20250613_165529
+
+Building connect...
+  Cold build time: 20.723674000s
+  Warm build time: 2.010370000s
+
+Building disconnect...
+  Cold build time: 20.345577000s
+  Warm build time: 1.940806000s
+
+Building router...
+  Cold build time: 15.818530000s
+  Warm build time: 1.284845000s
+
+Building processor...
+  Cold build time: 14.672052000s
+  Warm build time: 1.136950000s
+
+=== Test Execution Performance ===
+Test run 1 of 3:
+  Run 1: 73.277777000s
+Test run 2 of 3:
+  Run 2: 43.885815000s
+Test run 3 of 3:
+  Run 3: 42.940070000s
+
+
+=== Memory Usage Analysis ===
+connect binary size: 32M
+disconnect binary size: 32M
+router binary size: 19M
+processor binary size: 19M

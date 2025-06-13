@@ -1,0 +1,4 @@
+metrics/baseline/scripts/measure_init.go:15:2: no required module provides package github.com/pay-theory/streamer/pkg/queue; to add it:
+	go get github.com/pay-theory/streamer/pkg/queue
+metrics/baseline/scripts/measure_init.go:16:2: no required module provides package github.com/pay-theory/streamer/pkg/subscription; to add it:
+	go get github.com/pay-theory/streamer/pkg/subscription

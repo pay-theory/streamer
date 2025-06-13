@@ -1,3 +1,6 @@
+//go:build !lift
+// +build !lift
+
 package main
 
 import (
@@ -14,20 +17,18 @@ import (
 	"github.com/pay-theory/streamer/lambda/shared"
 )
 
-// HandlerConfig holds configuration for the handler
-type HandlerConfig struct {
-	TableName      string
-	JWTPublicKey   string
-	JWTIssuer      string
-	AllowedTenants []string
-	LogLevel       string
+// JWTVerifierInterface defines the interface for JWT verification
+type JWTVerifierInterface interface {
+	Verify(token string) (*Claims, error)
 }
+
+// HandlerConfig is defined in common.go
 
 // Handler handles WebSocket $connect requests
 type Handler struct {
 	store       store.ConnectionStore
 	config      *HandlerConfig
-	jwtVerifier *JWTVerifier
+	jwtVerifier JWTVerifierInterface
 	logger      *shared.Logger
 	metrics     shared.MetricsPublisher
 }
@@ -39,6 +40,17 @@ func NewHandler(store store.ConnectionStore, config *HandlerConfig, metrics shar
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
 
+	return &Handler{
+		store:       store,
+		config:      config,
+		jwtVerifier: verifier,
+		logger:      shared.NewLogger("connect-handler"),
+		metrics:     metrics,
+	}
+}
+
+// NewHandlerWithVerifier creates a new connect handler with a custom JWT verifier (for testing)
+func NewHandlerWithVerifier(store store.ConnectionStore, config *HandlerConfig, metrics shared.MetricsPublisher, verifier JWTVerifierInterface) *Handler {
 	return &Handler{
 		store:       store,
 		config:      config,
@@ -228,10 +240,4 @@ func internalErrorResponse(message string) (events.APIGatewayProxyResponse, erro
 	}, nil
 }
 
-func jsonStringify(v interface{}) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	return string(b)
-}
+// jsonStringify is defined in common.go

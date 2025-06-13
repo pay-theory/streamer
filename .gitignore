@@ -12,6 +12,8 @@
 *.out
 coverage.html
 store-coverage.html
+*_coverage.html
+*_coverage.out
 
 # Dependency directories
 vendor/
@@ -30,10 +32,17 @@ go.work
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
 # Build artifacts
 dist/
 build/
+/bin/
+
+# Lambda binaries
+/disconnect
+/connect
+/router.test
 
 # Local DynamoDB data
 .dynamodb/
@@ -50,10 +59,20 @@ build/
 # Temporary files
 tmp/
 temp/
+*.tmp
+*.temp
 
 # Binary output
 streamer
 main
 
 # AWS credentials
-.aws/ 
+.aws/
+
+# Metrics data (keep reports, archive raw data)
+metrics/archive/
+metrics/baseline/results_*/raw_data/
+
+# Development files
+*.bak
+*.orig 

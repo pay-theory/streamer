@@ -1,0 +1,2 @@
+Direct dependencies: 78
+Indirect dependencies:        0

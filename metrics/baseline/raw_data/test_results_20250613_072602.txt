@@ -1,0 +1,34 @@
+# github.com/pay-theory/streamer/examples/lift-integration
+examples/lift-integration/main.go:74:95: h.streamerRouter.GetHandler undefined (type *streamer.Router is pointer to interface, not interface)
+examples/lift-integration/main.go:98:21: ctx.GetHeader undefined (type *lift.Context has no field or method GetHeader)
+examples/lift-integration/main.go:107:46: cannot use map[string]interface{}{…} (value of type map[string]interface{}) as error value in argument to ctx.BadRequest: map[string]interface{} does not implement error (missing method Error)
+examples/lift-integration/main.go:121:15: ctx.RequestTimeout undefined (type *lift.Context has no field or method RequestTimeout)
+examples/lift-integration/main.go:127:106: cannot use map[string]interface{}{…} (value of type map[string]interface{}) as error value in argument to ctx.InternalError: map[string]interface{} does not implement error (missing method Error)
+examples/lift-integration/main.go:158:21: ctx.GetHeader undefined (type *lift.Context has no field or method GetHeader)
+examples/lift-integration/main.go:173:55: cannot use map[string]interface{}{…} (value of type map[string]interface{}) as error value in argument to ctx.InternalError: map[string]interface{} does not implement error (missing method Error)
+examples/lift-integration/main.go:181:70: ctx.Accepted undefined (type *lift.Context has no field or method Accepted)
+examples/lift-integration/main.go:201:45: cannot use map[string]interface{}{…} (value of type map[string]interface{}) as error value in argument to ctx.NotFound: map[string]interface{} does not implement error (missing method Error)
+examples/lift-integration/main.go:214:27: asyncReq.UpdatedAt undefined (type *store.AsyncRequest has no field or method UpdatedAt)
+examples/lift-integration/main.go:214:27: too many errors
+	github.com/pay-theory/streamer/demo		coverage: 0.0% of statements
+FAIL	github.com/pay-theory/streamer/examples/lift-integration [build failed]
+ok  	github.com/pay-theory/streamer/internal/protocol	1.502s	coverage: 98.6% of statements
+	github.com/pay-theory/streamer/lambda/processor		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/internal/store	2.550s	coverage: 80.8% of statements
+ok  	github.com/pay-theory/streamer/internal/store/dynamorm	1.700s	coverage: 84.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/connect	3.511s	coverage: 71.7% of statements
+ok  	github.com/pay-theory/streamer/lambda/disconnect	2.616s	coverage: 73.8% of statements
+	github.com/pay-theory/streamer/scripts		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/scripts/demo		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/executor	6.423s	coverage: 90.1% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/handlers	40.044s	coverage: 62.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/router	1.959s	coverage: 84.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/shared	2.485s	coverage: 54.7% of statements
+ok  	github.com/pay-theory/streamer/pkg/connection	5.183s	coverage: 63.5% of statements
+ok  	github.com/pay-theory/streamer/pkg/progress	2.121s	coverage: 95.1% of statements
+ok  	github.com/pay-theory/streamer/pkg/streamer	1.574s	coverage: 97.8% of statements
+ok  	github.com/pay-theory/streamer/pkg/types	2.495s	coverage: 100.0% of statements
+ok  	github.com/pay-theory/streamer/tests/integration	3.131s	coverage: [no statements]
+ok  	github.com/pay-theory/streamer/tests/performance	1.763s	coverage: [no statements] [no tests to run]
+ok  	github.com/pay-theory/streamer/tests/unit	1.184s	coverage: [no statements]
+FAIL

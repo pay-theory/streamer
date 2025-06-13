@@ -1,0 +1,34 @@
+{
+  "timestamp": "20250613_103353",
+  "build_times": {
+    "connect": {
+      "cold": 21.220866,
+      "warm": 2.454015
+    },
+    "disconnect": {
+      "cold": 22.17673,
+      "warm": 2.02311
+    },
+    "router": {
+      "cold": 21.565902,
+      "warm": 2.18461
+    },
+    "processor": {
+      "cold": 14.554807,
+      "warm": 1.736556
+    }
+  },
+  "test_execution": {
+    "iterations": 3,
+    "times": [
+      71.99577,
+      42.726898,
+      41.672768
+    ],
+    "average": 52.131812
+  },
+  "recommendations": [
+    "High build times detected - Lift's optimized build process could help",
+    "Long test execution times - Consider parallelizing tests"
+  ]
+}

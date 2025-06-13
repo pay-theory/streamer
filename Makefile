@@ -89,28 +89,32 @@ test-store-coverage:
 	go tool cover -html=store-coverage.out -o store-coverage.html
 	@echo "Storage layer coverage report: store-coverage.html"
 
-# Lambda deployment targets
+# Lambda deployment targets (using optimized Lift builds)
 build-lambdas: build-lambda-connect build-lambda-disconnect build-lambda-router build-lambda-processor
 	@echo "All Lambda deployment packages built successfully"
 
+# Build original (non-optimized) versions for comparison
+build-lambdas-original: build-lambda-connect-original build-lambda-disconnect-original build-lambda-router-original build-lambda-processor
+	@echo "All original Lambda deployment packages built successfully"
+
 build-lambda-connect:
-	@echo "Building connect Lambda..."
+	@echo "Building connect Lambda (optimized)..."
 	@cd lambda/connect && \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap . && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,optimized,lambda.norpc" -o bootstrap . && \
 		zip deployment.zip bootstrap && \
 		rm bootstrap
 
 build-lambda-disconnect:
-	@echo "Building disconnect Lambda..."
+	@echo "Building disconnect Lambda (optimized)..."
 	@cd lambda/disconnect && \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap . && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,optimized,lambda.norpc" -o bootstrap . && \
 		zip deployment.zip bootstrap && \
 		rm bootstrap
 
 build-lambda-router:
-	@echo "Building router Lambda..."
+	@echo "Building router Lambda (optimized)..."
 	@cd lambda/router && \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap . && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,optimized,lambda.norpc" -o bootstrap . && \
 		zip deployment.zip bootstrap && \
 		rm bootstrap
 
@@ -119,4 +123,26 @@ build-lambda-processor:
 	@cd lambda/processor && \
 		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags lambda.norpc -o bootstrap . && \
 		zip deployment.zip bootstrap && \
+		rm bootstrap
+
+# Original (non-optimized) build targets for comparison
+build-lambda-connect-original:
+	@echo "Building connect Lambda (original)..."
+	@cd lambda/connect && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,lambda.norpc" -o bootstrap . && \
+		zip deployment-original.zip bootstrap && \
+		rm bootstrap
+
+build-lambda-disconnect-original:
+	@echo "Building disconnect Lambda (original)..."
+	@cd lambda/disconnect && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,lambda.norpc" -o bootstrap . && \
+		zip deployment-original.zip bootstrap && \
+		rm bootstrap
+
+build-lambda-router-original:
+	@echo "Building router Lambda (original)..."
+	@cd lambda/router && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags "lift,lambda.norpc" -o bootstrap . && \
+		zip deployment-original.zip bootstrap && \
 		rm bootstrap 

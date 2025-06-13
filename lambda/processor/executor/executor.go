@@ -16,7 +16,7 @@ import (
 
 // AsyncExecutor handles async request processing
 type AsyncExecutor struct {
-	connManager      *connection.Manager
+	connManager      connection.ConnectionManager
 	requestQueue     store.RequestQueue
 	handlers         map[string]streamer.Handler
 	progressHandlers map[string]streamer.HandlerWithProgress
@@ -25,7 +25,7 @@ type AsyncExecutor struct {
 }
 
 // New creates a new async executor
-func New(connManager *connection.Manager, requestQueue store.RequestQueue, logger *log.Logger) *AsyncExecutor {
+func New(connManager connection.ConnectionManager, requestQueue store.RequestQueue, logger *log.Logger) *AsyncExecutor {
 	return &AsyncExecutor{
 		connManager:      connManager,
 		requestQueue:     requestQueue,

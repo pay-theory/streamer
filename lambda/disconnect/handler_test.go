@@ -1,3 +1,6 @@
+//go:build !lift
+// +build !lift
+
 package main
 
 import (
@@ -163,6 +166,11 @@ func TestHandler_Handle(t *testing.T) {
 				// Connection doesn't exist
 				connStore.On("Get", mock.Anything, "missing-conn").Return(nil, store.ErrNotFound)
 				connStore.On("Delete", mock.Anything, "missing-conn").Return(nil)
+
+				// Still try to clean up subscriptions and requests
+				subStore.On("CountByConnection", mock.Anything, "missing-conn").Return(0, nil)
+				subStore.On("DeleteByConnection", mock.Anything, "missing-conn").Return(nil)
+				reqStore.On("CancelByConnection", mock.Anything, "missing-conn").Return(0, nil)
 			},
 			expectedStatus: 200,
 			expectedBody:   `{"message":"Disconnected successfully"}`,
@@ -179,6 +187,11 @@ func TestHandler_Handle(t *testing.T) {
 				conn := createTestConnection("error-conn", time.Now().Add(-1*time.Hour))
 				connStore.On("Get", mock.Anything, "error-conn").Return(conn, nil)
 				connStore.On("Delete", mock.Anything, "error-conn").Return(errors.New("DynamoDB error"))
+
+				// Still try to clean up subscriptions and requests
+				subStore.On("CountByConnection", mock.Anything, "error-conn").Return(0, nil)
+				subStore.On("DeleteByConnection", mock.Anything, "error-conn").Return(nil)
+				reqStore.On("CancelByConnection", mock.Anything, "error-conn").Return(0, nil)
 			},
 			expectedStatus: 200, // Still returns 200
 			expectedBody:   `{"message":"Disconnected successfully"}`,
@@ -197,6 +210,9 @@ func TestHandler_Handle(t *testing.T) {
 				// Subscription cleanup fails
 				subStore.On("CountByConnection", mock.Anything, "sub-error-conn").Return(2, nil)
 				subStore.On("DeleteByConnection", mock.Anything, "sub-error-conn").Return(errors.New("subscription error"))
+
+				// Still try to cancel requests
+				reqStore.On("CancelByConnection", mock.Anything, "sub-error-conn").Return(0, nil)
 			},
 			expectedStatus: 200, // Still returns 200
 			expectedBody:   `{"message":"Disconnected successfully"}`,
@@ -296,6 +312,8 @@ func TestHandler_HandleWithoutStores(t *testing.T) {
 
 	// Create mock metrics publisher
 	mockMetrics := new(mockMetricsPublisher)
+	mockMetrics.On("PublishMetric", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockMetrics.On("PublishLatency", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 	handler := NewHandler(mockConnStore, nil, nil, config, mockMetrics)
 

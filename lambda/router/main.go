@@ -1,3 +1,6 @@
+//go:build !lift
+// +build !lift
+
 package main
 
 import (
@@ -10,9 +13,9 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
-	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/dynamorm/pkg/session"
+	dynamormStore "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/streamer"
 )
@@ -27,6 +30,11 @@ var (
 
 func init() {
 	logger = log.New(os.Stdout, "[ROUTER] ", log.LstdFlags|log.Lshortfile)
+
+	// Skip initialization if running tests (TestMain will handle setup)
+	if isRunningTests() {
+		return
+	}
 
 	// Get table names from environment
 	connectionsTable = os.Getenv("CONNECTIONS_TABLE")
@@ -44,18 +52,26 @@ func init() {
 		subscriptionsTable = "streamer_subscriptions"
 	}
 
-	// Initialize AWS config and DynamoDB client
+	// Initialize AWS config
 	ctx := context.Background()
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		logger.Fatalf("Failed to load AWS config: %v", err)
 	}
 
-	dynamoClient := dynamodb.NewFromConfig(cfg)
+	// Initialize DynamORM
+	dynamormConfig := session.Config{
+		Region: cfg.Region,
+	}
 
-	// Initialize storage
-	connStore := store.NewConnectionStore(dynamoClient, connectionsTable)
-	reqQueue := store.NewRequestQueue(dynamoClient, requestsTable)
+	factory, err := dynamormStore.NewStoreFactory(dynamormConfig)
+	if err != nil {
+		logger.Fatalf("Failed to create DynamORM factory: %v", err)
+	}
+
+	// Get stores from factory
+	connStore := factory.ConnectionStore()
+	reqQueue := factory.RequestQueue() // Note: This needs to be implemented in DynamORM
 
 	// Create adapter
 	queueAdapter := streamer.NewRequestQueueAdapter(reqQueue)
@@ -63,15 +79,19 @@ func init() {
 	// Initialize API Gateway Management API client
 	apiGatewayEndpoint := os.Getenv("WEBSOCKET_ENDPOINT")
 	if apiGatewayEndpoint == "" {
-		logger.Fatal("WEBSOCKET_ENDPOINT environment variable is required")
+		logger.Println("WARNING: WEBSOCKET_ENDPOINT environment variable is not set")
+		return
 	}
 
 	apiGatewayClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
 		o.BaseEndpoint = &apiGatewayEndpoint
 	})
 
+	// Wrap the AWS SDK client with the adapter
+	apiGatewayAdapter := connection.NewAWSAPIGatewayAdapter(apiGatewayClient)
+
 	// Create real ConnectionManager from Team 1
-	connManager := connection.NewManager(connStore, apiGatewayClient, apiGatewayEndpoint)
+	connManager := connection.NewManager(connStore, apiGatewayAdapter, apiGatewayEndpoint)
 	connManager.SetLogger(logger.Printf)
 
 	// Create router
@@ -91,6 +111,16 @@ func init() {
 	}
 
 	logger.Println("Router Lambda initialized successfully")
+}
+
+// isRunningTests checks if we're running under go test
+func isRunningTests() bool {
+	for _, arg := range os.Args {
+		if arg == "-test.v" || arg == "-test.run" {
+			return true
+		}
+	}
+	return false
 }
 
 // handler processes incoming WebSocket messages

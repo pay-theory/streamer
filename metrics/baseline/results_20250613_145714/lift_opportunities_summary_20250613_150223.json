@@ -1,0 +1,20 @@
+{
+  "timestamp": "20250613_150223",
+  "boilerplate_metrics": {
+    "error_handling_statements": 61,
+    "context_usage": 244,
+    "jwt_references": 237,
+    "validation_references": 158,
+    "config_references": 143
+  },
+  "estimated_savings": {
+    "lines_of_code": 334,
+    "percentage_reduction": 35
+  },
+  "migration_priorities": [
+    "connect",
+    "router",
+    "disconnect",
+    "processor"
+  ]
+}

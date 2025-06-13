@@ -1,3 +1,6 @@
+//go:build !optimized
+// +build !optimized
+
 package shared
 
 import (
@@ -19,6 +22,11 @@ type TraceSegment struct {
 // StartSubsegment starts a new X-Ray subsegment with custom data
 func StartSubsegment(ctx context.Context, name string, data TraceSegment) (context.Context, *xray.Segment) {
 	ctx, seg := xray.BeginSubsegment(ctx, name)
+
+	// Handle nil segment (e.g., in test environments)
+	if seg == nil {
+		return ctx, nil
+	}
 
 	// Add annotations for searchable fields
 	if data.ConnectionID != "" {
@@ -51,6 +59,9 @@ func StartSubsegment(ctx context.Context, name string, data TraceSegment) (conte
 
 // EndSubsegment ends an X-Ray subsegment and records any error
 func EndSubsegment(seg *xray.Segment, err error) {
+	if seg == nil {
+		return
+	}
 	if err != nil {
 		seg.AddError(err)
 	}
@@ -68,6 +79,11 @@ func CaptureFunc(ctx context.Context, name string, fn func(context.Context) erro
 func CaptureFuncWithData(ctx context.Context, name string, data TraceSegment, fn func(context.Context) error) error {
 	return xray.Capture(ctx, name, func(ctx1 context.Context) error {
 		seg := xray.GetSegment(ctx1)
+
+		// Handle nil segment (e.g., in test environments)
+		if seg == nil {
+			return fn(ctx1)
+		}
 
 		// Add custom data to segment
 		if data.ConnectionID != "" {

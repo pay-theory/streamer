@@ -34,7 +34,6 @@ func registerHandlers(router *streamer.DefaultRouter) error {
 		return fmt.Errorf("failed to register bulk handler: %w", err)
 	}
 
-	logger.Printf("Registered %d handlers", 5)
 	return nil
 }
 

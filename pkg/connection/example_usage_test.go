@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/dynamorm/pkg/session"
+	"github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/pkg/connection"
 )
 
@@ -23,11 +23,18 @@ func Example() {
 		log.Fatal(err)
 	}
 
-	// Create DynamoDB client for the store
-	dynamoClient := dynamodb.NewFromConfig(cfg)
+	// Create DynamORM factory
+	dynamormConfig := session.Config{
+		Region: cfg.Region,
+	}
 
-	// Create connection store
-	connStore := store.NewConnectionStore(dynamoClient, "streamer_connections")
+	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	if err != nil {
+		log.Fatalf("Failed to create DynamORM store factory: %v", err)
+	}
+
+	// Get connection store from factory
+	connStore := storeFactory.ConnectionStore()
 
 	// Create API Gateway Management API client
 	// The endpoint should be your WebSocket API endpoint
@@ -40,8 +47,11 @@ func Example() {
 		})
 	})
 
+	// Wrap the AWS SDK client with our adapter
+	apiGatewayAdapter := connection.NewAWSAPIGatewayAdapter(apiGatewayClient)
+
 	// Create connection manager
-	manager := connection.NewManager(connStore, apiGatewayClient, endpoint)
+	manager := connection.NewManager(connStore, apiGatewayAdapter, endpoint)
 
 	// Optional: Set custom logger
 	manager.SetLogger(func(format string, args ...interface{}) {

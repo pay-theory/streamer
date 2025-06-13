@@ -1,3 +1,6 @@
+//go:build !lift
+// +build !lift
+
 package main
 
 import (
@@ -7,8 +10,8 @@ import (
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/dynamorm/pkg/session"
+	dynamormStore "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/lambda/shared"
 )
 
@@ -22,17 +25,24 @@ func main() {
 		LogLevel:           getEnv("LOG_LEVEL", "INFO"),
 	}
 
-	// Initialize AWS SDK
+	// Initialize AWS SDK for CloudWatch metrics
 	awsCfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
 		log.Fatalf("Failed to load AWS config: %v", err)
 	}
 
-	// Create DynamoDB client
-	dynamoClient := dynamodb.NewFromConfig(awsCfg)
+	// Initialize DynamORM
+	dynamormConfig := session.Config{
+		Region: awsCfg.Region,
+	}
 
-	// Create stores
-	connStore := store.NewConnectionStore(dynamoClient, cfg.ConnectionsTable)
+	factory, err := dynamormStore.NewStoreFactory(dynamormConfig)
+	if err != nil {
+		log.Fatalf("Failed to create DynamORM factory: %v", err)
+	}
+
+	// Get stores from factory
+	connStore := factory.ConnectionStore()
 	// Note: SubscriptionStore and RequestStore would be initialized here when implemented
 
 	// Create CloudWatch metrics client

@@ -1,0 +1,12 @@
+=== Boilerplate Analysis ===
+Lambda initialization patterns:
+       8
+
+Error handling patterns:
+     137
+
+Logging statements:
+      91
+
+Context handling:
+     580

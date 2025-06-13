@@ -1,0 +1,12 @@
+demo/generate_jwt.go:15:2: missing go.sum entry for module providing package github.com/golang-jwt/jwt/v5 (imported by github.com/pay-theory/streamer/demo); to add:
+	go get github.com/pay-theory/streamer/demo
+../../go/pkg/mod/github.com/pay-theory/lift@v0.0.0-20250613104105-d3460666c223/pkg/security/secrets.go:13:2: missing go.sum entry for module providing package github.com/aws/aws-sdk-go-v2/service/secretsmanager (imported by github.com/pay-theory/lift/pkg/security); to add:
+	go get github.com/pay-theory/lift/pkg/security@v0.0.0-20250613104105-d3460666c223
+../../go/pkg/mod/github.com/pay-theory/lift@v0.0.0-20250613104105-d3460666c223/pkg/security/secrets.go:14:2: missing go.sum entry for module providing package github.com/aws/aws-sdk-go-v2/service/secretsmanager/types (imported by github.com/pay-theory/lift/pkg/security); to add:
+	go get github.com/pay-theory/lift/pkg/security@v0.0.0-20250613104105-d3460666c223
+../../go/pkg/mod/github.com/pay-theory/lift@v0.0.0-20250613104105-d3460666c223/pkg/observability/interfaces.go:7:2: missing go.sum entry for module providing package github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs (imported by github.com/pay-theory/lift/pkg/observability); to add:
+	go get github.com/pay-theory/lift/pkg/observability@v0.0.0-20250613104105-d3460666c223
+lambda/connect/handler.go:12:2: missing go.sum entry for module providing package github.com/aws/aws-sdk-go-v2/service/cloudwatch/types (imported by github.com/pay-theory/streamer/lambda/connect); to add:
+	go get github.com/pay-theory/streamer/lambda/connect
+lambda/shared/metrics.go:8:2: missing go.sum entry for module providing package github.com/aws/aws-sdk-go-v2/service/cloudwatch (imported by github.com/pay-theory/streamer/lambda/shared); to add:
+	go get github.com/pay-theory/streamer/lambda/shared

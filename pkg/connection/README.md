@@ -138,6 +138,39 @@ mockAPI.On("PostToConnection", mock.Anything, mock.Anything).Return(output, nil)
 manager := NewManager(mockStore, mockAPI, endpoint)
 ```
 
+### Premade Mocks for Your Tests
+
+We provide several ready-to-use mocks in `testing.go`:
+
+#### SendOnlyMock
+For packages that only need the Send method:
+```go
+mock := connection.NewSendOnlyMock()
+router := streamer.NewRouter(store, mock)
+
+// Verify messages
+messages := mock.GetMessages("conn-123")
+```
+
+#### ProgressReporterMock  
+For packages that need Send + IsActive:
+```go
+mock := connection.NewProgressReporterMock()
+mock.SetActive("conn-123", true)
+
+reporter := progress.NewReporter("req-123", "conn-123", mock)
+```
+
+#### FailingMock
+For error handling tests:
+```go
+mock := connection.NewFailingMock(errors.New("network error"))
+err := mock.Send(ctx, "any", "message")
+// err will be "network error"
+```
+
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for comprehensive testing documentation.
+
 ## Integration with Team 2
 
 Team 2 can use this ConnectionManager in their router and async processor:

@@ -1,0 +1,52 @@
+	github.com/pay-theory/streamer/demo		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/examples		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/internal/protocol	1.252s	coverage: 98.6% of statements
+ok  	github.com/pay-theory/streamer/internal/store	1.744s	coverage: 34.5% of statements
+ok  	github.com/pay-theory/streamer/internal/store/dynamorm	1.614s	coverage: 88.8% of statements
+	github.com/pay-theory/streamer/metrics/baseline/scripts		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/scripts		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/scripts/demo		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/connect	8.302s	coverage: 72.8% of statements
+ok  	github.com/pay-theory/streamer/lambda/disconnect	2.336s	coverage: 73.8% of statements
+[PROCESSOR] 2025/06/13 16:54:37 main.go:57: WEBSOCKET_ENDPOINT environment variable is required
+FAIL	github.com/pay-theory/streamer/lambda/processor	2.868s
+ok  	github.com/pay-theory/streamer/lambda/processor/executor	8.121s	coverage: 90.1% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/handlers	40.862s	coverage: 62.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/router	2.631s	coverage: 84.2% of statements
+ok  	github.com/pay-theory/streamer/lambda/shared	1.666s	coverage: 54.7% of statements
+ok  	github.com/pay-theory/streamer/pkg/connection	4.029s	coverage: 47.0% of statements
+--- FAIL: TestBatcherShutdown (0.00s)
+    batcher_test.go:293: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:293
+        	Error:      	Should have called with given arguments
+        	Test:       	TestBatcherShutdown
+        	Messages:   	Expected "Report" to have been called with:
+        	            	[10 Progress 1]
+        	            	but no actual calls happened
+    batcher_test.go:294: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:294
+        	Error:      	Should have called with given arguments
+        	Test:       	TestBatcherShutdown
+        	Messages:   	Expected "Report" to have been called with:
+        	            	[20 Progress 2]
+        	            	but no actual calls happened
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 25% - Quarter done
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 50% - Processing halfway
+2025/06/13 16:54:41 [Progress] Connection conn456 no longer active for request req123
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 75% - Almost done
+2025/06/13 16:54:41 [Progress] Failed to send update for request req123: send failed
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 100% - Complete
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 10% - Starting
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 30% - More progress
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 50% - With metadata
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 50% - Halfway
+2025/06/13 16:54:41 [Progress] Sending update for request req123: 40% - Progress
+FAIL
+coverage: 95.1% of statements
+FAIL	github.com/pay-theory/streamer/pkg/progress	3.059s
+ok  	github.com/pay-theory/streamer/pkg/streamer	1.412s	coverage: 97.8% of statements
+ok  	github.com/pay-theory/streamer/pkg/types	0.839s	coverage: 100.0% of statements
+ok  	github.com/pay-theory/streamer/tests/integration	2.318s	coverage: [no statements]
+ok  	github.com/pay-theory/streamer/tests/performance	0.600s	coverage: [no statements] [no tests to run]
+ok  	github.com/pay-theory/streamer/tests/unit	1.291s	coverage: [no statements]
+FAIL

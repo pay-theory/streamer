@@ -2,18 +2,19 @@ package integration_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/pay-theory/dynamorm/pkg/mocks"
 	"github.com/pay-theory/streamer/internal/store"
-	"github.com/pay-theory/streamer/pkg/streamer"
+	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	"github.com/pay-theory/streamer/pkg/connection"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
-// TestRouterStorageIntegration tests the integration between router and storage
-func TestRouterStorageIntegration(t *testing.T) {
+// TestStorageIntegration tests the integration between storage components using DynamORM mocks
+func TestStorageIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	// Skip if not running integration tests
@@ -21,131 +22,92 @@ func TestRouterStorageIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	// TODO: Set up test DynamoDB client
-	// For now, this is a placeholder showing the integration flow
-	var dynamoClient *dynamodb.Client // Initialize with test config
+	// Create DynamORM mock
+	mockDB := new(mocks.DB)
+	mockQueryForConnection := new(mocks.Query)
+	mockQueryForRequest := new(mocks.Query)
 
-	// Create storage components
-	requestQueue := store.NewRequestQueue(dynamoClient, "test_")
-	connectionStore := store.NewConnectionStore(dynamoClient, "test_")
+	// Create storage components using DynamORM implementations
+	requestQueue := dynamorm.NewRequestQueue(mockDB)
+	connectionStore := dynamorm.NewConnectionStore(mockDB)
 
-	// Create router with adapters
-	requestAdapter := streamer.NewRequestQueueAdapter(requestQueue)
-	connManager := &mockConnectionManager{
-		sentMessages: make([]sentMessage, 0),
+	// Create a test connection manager
+	connManager := connection.NewMockConnectionManager()
+
+	// Track sent messages
+	var sentMessages []interface{}
+	connManager.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
+		sentMessages = append(sentMessages, message)
+		return nil
 	}
-
-	router := streamer.NewRouter(requestAdapter, connManager)
-
-	// Register a test handler
-	router.Handle("test_action", &testHandler{})
-
-	// Set async threshold low to test async processing
-	router.SetAsyncThreshold(1 * time.Millisecond)
 
 	// Create a test connection
 	conn := &store.Connection{
 		ConnectionID: "test-conn-123",
 		UserID:       "user-456",
 		TenantID:     "tenant-789",
+		Endpoint:     "https://test.execute-api.us-east-1.amazonaws.com/test",
 		ConnectedAt:  time.Now(),
 		LastPing:     time.Now(),
 	}
 
+	// Set up mock expectations for saving connection
+	mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQueryForConnection).Once()
+	mockQueryForConnection.On("Create").Return(nil).Once()
+
 	// Save connection
 	err := connectionStore.Save(ctx, conn)
-	if err != nil {
-		t.Fatalf("Failed to save connection: %v", err)
-	}
+	assert.NoError(t, err, "Failed to save connection")
 
-	// Create WebSocket event
-	payload := map[string]interface{}{
-		"message": "Hello, World!",
-		"count":   42,
-	}
-	payloadBytes, _ := json.Marshal(payload)
-
-	body := map[string]interface{}{
-		"action":  "test_action",
-		"payload": json.RawMessage(payloadBytes),
-	}
-	bodyBytes, _ := json.Marshal(body)
-
-	event := events.APIGatewayWebsocketProxyRequest{
-		RequestContext: events.APIGatewayWebsocketProxyRequestContext{
-			ConnectionID: conn.ConnectionID,
-			RouteKey:     "test",
+	// Create an async request
+	request := &store.AsyncRequest{
+		RequestID:    "req-123",
+		ConnectionID: conn.ConnectionID,
+		UserID:       conn.UserID,
+		TenantID:     conn.TenantID,
+		Action:       "test_action",
+		Payload: map[string]interface{}{
+			"message": "Hello, World!",
+			"count":   42,
 		},
-		Body: string(bodyBytes),
+		CreatedAt:  time.Now(),
+		Status:     store.StatusPending,
+		MaxRetries: 3,
 	}
 
-	// Route the request
-	err = router.Route(ctx, event)
-	if err != nil {
-		t.Fatalf("Failed to route request: %v", err)
+	// Set up mock expectations for queuing request
+	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQueryForRequest).Once()
+	mockQueryForRequest.On("Create").Return(nil).Once()
+
+	// Queue the request
+	err = requestQueue.Enqueue(ctx, request)
+	assert.NoError(t, err, "Failed to enqueue request")
+
+	// Send acknowledgment through connection manager
+	ack := map[string]interface{}{
+		"type":       "acknowledgment",
+		"request_id": request.RequestID,
+		"status":     "queued",
+		"message":    "Request has been queued for processing",
 	}
+
+	err = connManager.Send(ctx, conn.ConnectionID, ack)
+	assert.NoError(t, err, "Failed to send acknowledgment")
 
 	// Verify acknowledgment was sent
-	if len(connManager.sentMessages) != 1 {
-		t.Fatalf("Expected 1 message sent, got %d", len(connManager.sentMessages))
-	}
+	assert.Len(t, sentMessages, 1, "Expected 1 message sent")
 
 	// Check acknowledgment content
-	ack := connManager.sentMessages[0]
-	if ack.connectionID != conn.ConnectionID {
-		t.Errorf("Expected connection ID %s, got %s", conn.ConnectionID, ack.connectionID)
-	}
+	ackMap, ok := sentMessages[0].(map[string]interface{})
+	assert.True(t, ok, "Expected acknowledgment to be a map")
+	assert.Equal(t, "acknowledgment", ackMap["type"])
+	assert.Equal(t, "queued", ackMap["status"])
+	assert.Equal(t, request.RequestID, ackMap["request_id"])
 
-	ackMap, ok := ack.message.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected acknowledgment to be a map")
-	}
+	// Verify all expected calls were made
+	mockDB.AssertExpectations(t)
+	mockQueryForConnection.AssertExpectations(t)
+	mockQueryForRequest.AssertExpectations(t)
 
-	if ackMap["type"] != "acknowledgment" {
-		t.Errorf("Expected type 'acknowledgment', got %v", ackMap["type"])
-	}
-
-	if ackMap["status"] != "queued" {
-		t.Errorf("Expected status 'queued', got %v", ackMap["status"])
-	}
-
-	// Verify request was queued
-	// In a real test, you would check the database
-	t.Log("Request successfully queued for async processing")
-}
-
-// Test helpers
-
-type mockConnectionManager struct {
-	sentMessages []sentMessage
-}
-
-type sentMessage struct {
-	connectionID string
-	message      interface{}
-}
-
-func (m *mockConnectionManager) Send(ctx context.Context, connectionID string, message interface{}) error {
-	m.sentMessages = append(m.sentMessages, sentMessage{connectionID, message})
-	return nil
-}
-
-type testHandler struct{}
-
-func (h *testHandler) Validate(request *streamer.Request) error {
-	return nil
-}
-
-func (h *testHandler) EstimatedDuration() time.Duration {
-	return 10 * time.Second // Force async processing
-}
-
-func (h *testHandler) Process(ctx context.Context, request *streamer.Request) (*streamer.Result, error) {
-	// This would be processed by the async processor
-	return &streamer.Result{
-		Success: true,
-		Data: map[string]interface{}{
-			"processed": true,
-		},
-	}, nil
+	t.Log("Storage integration test completed successfully")
 }

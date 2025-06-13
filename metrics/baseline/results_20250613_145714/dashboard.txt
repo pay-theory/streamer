@@ -1,0 +1,19 @@
+╔══════════════════════════════════════════════════════════╗
+║          STREAMER BASELINE METRICS DASHBOARD             ║
+╠══════════════════════════════════════════════════════════╣
+║                                                          ║
+║  📊 Code Metrics                                         ║
+║  ├─ Lines of Code: Check cloc_metrics_*.txt             ║
+║  ├─ Complexity: Check complexity_metrics_*.txt          ║
+║  └─ Coverage: Check coverage_summary_*.txt              ║
+║                                                          ║
+║  ⚡ Performance                                          ║
+║  ├─ Build Times: Check performance_benchmarks_*.txt     ║
+║  ├─ Test Speed: Check performance_benchmarks_*.json     ║
+║  └─ Bundle Sizes: Check bundle_sizes_*.txt              ║
+║                                                          ║
+║  🎯 Lift Opportunities                                   ║
+║  ├─ Analysis: Check lift_opportunities_*.md             ║
+║  └─ Summary: Check lift_opportunities_summary_*.json    ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝

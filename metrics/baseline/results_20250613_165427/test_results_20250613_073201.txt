@@ -1,0 +1,49 @@
+	github.com/pay-theory/streamer/demo		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/lambda/processor		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/internal/protocol	1.006s	coverage: 98.6% of statements
+ok  	github.com/pay-theory/streamer/internal/store	1.680s	coverage: 80.8% of statements
+ok  	github.com/pay-theory/streamer/internal/store/dynamorm	1.037s	coverage: 84.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/connect	2.562s	coverage: 71.7% of statements
+ok  	github.com/pay-theory/streamer/lambda/disconnect	2.298s	coverage: 73.8% of statements
+	github.com/pay-theory/streamer/scripts		coverage: 0.0% of statements
+	github.com/pay-theory/streamer/scripts/demo		coverage: 0.0% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/executor	6.176s	coverage: 90.1% of statements
+ok  	github.com/pay-theory/streamer/lambda/processor/handlers	39.994s	coverage: 62.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/router	1.436s	coverage: 84.3% of statements
+ok  	github.com/pay-theory/streamer/lambda/shared	1.437s	coverage: 54.7% of statements
+ok  	github.com/pay-theory/streamer/pkg/connection	5.214s	coverage: 63.5% of statements
+--- FAIL: TestBatcherShutdown (0.00s)
+    batcher_test.go:293: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:293
+        	Error:      	Should have called with given arguments
+        	Test:       	TestBatcherShutdown
+        	Messages:   	Expected "Report" to have been called with:
+        	            	[10 Progress 1]
+        	            	but no actual calls happened
+    batcher_test.go:294: 
+        	Error Trace:	/Users/aronprice/architect/streamer/pkg/progress/batcher_test.go:294
+        	Error:      	Should have called with given arguments
+        	Test:       	TestBatcherShutdown
+        	Messages:   	Expected "Report" to have been called with:
+        	            	[20 Progress 2]
+        	            	but no actual calls happened
+2025/06/13 07:32:08 [Progress] Sending update for request req123: 25% - Quarter done
+2025/06/13 07:32:08 [Progress] Sending update for request req123: 50% - Processing halfway
+2025/06/13 07:32:08 [Progress] Connection conn456 no longer active for request req123
+2025/06/13 07:32:08 [Progress] Sending update for request req123: 75% - Almost done
+2025/06/13 07:32:08 [Progress] Failed to send update for request req123: send failed
+2025/06/13 07:32:08 [Progress] Sending update for request req123: 100% - Complete
+2025/06/13 07:32:08 [Progress] Sending update for request req123: 10% - Starting
+2025/06/13 07:32:09 [Progress] Sending update for request req123: 30% - More progress
+2025/06/13 07:32:09 [Progress] Sending update for request req123: 50% - With metadata
+2025/06/13 07:32:09 [Progress] Sending update for request req123: 50% - Halfway
+2025/06/13 07:32:09 [Progress] Sending update for request req123: 10% - Progress
+FAIL
+coverage: 97.5% of statements
+FAIL	github.com/pay-theory/streamer/pkg/progress	2.186s
+ok  	github.com/pay-theory/streamer/pkg/streamer	1.035s	coverage: 97.8% of statements
+ok  	github.com/pay-theory/streamer/pkg/types	0.591s	coverage: 100.0% of statements
+ok  	github.com/pay-theory/streamer/tests/integration	1.841s	coverage: [no statements]
+ok  	github.com/pay-theory/streamer/tests/performance	0.625s	coverage: [no statements] [no tests to run]
+ok  	github.com/pay-theory/streamer/tests/unit	0.539s	coverage: [no statements]
+FAIL

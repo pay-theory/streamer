@@ -1,0 +1,33 @@
+{
+  "timestamp": "20250613_073743",
+  "build_times": {
+    "connect": {
+      "cold": 20.372975,
+      "warm": 1.752358
+    },
+    "disconnect": {
+      "cold": 20.51656,
+      "warm": 1.839293
+    },
+    "router": {
+      "cold": 15.473189,
+      "warm": 1.147709
+    },
+    "processor": {
+      "cold": 14.43624,
+      "warm": 1.140248
+    }
+  },
+  "test_execution": {
+    "iterations": 3,
+    "times": [
+      1.024948,
+      0.303252,
+      0.239693
+    ],
+    "average": 0.522631
+  },
+  "recommendations": [
+    "High build times detected - Lift's optimized build process could help"
+  ]
+}

@@ -12,9 +12,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/pay-theory/dynamorm/pkg/session"
 
 	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/lambda/processor/executor"
 	"github.com/pay-theory/streamer/lambda/processor/handlers"
 	"github.com/pay-theory/streamer/pkg/connection"
@@ -22,25 +23,12 @@ import (
 )
 
 var (
-	exec             *executor.AsyncExecutor
-	logger           *log.Logger
-	connectionsTable string
-	requestsTable    string
+	exec   *executor.AsyncExecutor
+	logger *log.Logger
 )
 
 func init() {
 	logger = log.New(os.Stdout, "[PROCESSOR] ", log.LstdFlags|log.Lshortfile)
-
-	// Get table names from environment
-	connectionsTable = os.Getenv("CONNECTIONS_TABLE")
-	if connectionsTable == "" {
-		connectionsTable = "streamer_connections"
-	}
-
-	requestsTable = os.Getenv("REQUESTS_TABLE")
-	if requestsTable == "" {
-		requestsTable = "streamer_requests"
-	}
 
 	// Initialize AWS config
 	ctx := context.Background()
@@ -49,12 +37,19 @@ func init() {
 		logger.Fatalf("Failed to load AWS config: %v", err)
 	}
 
-	// Initialize DynamoDB client
-	dynamoClient := dynamodb.NewFromConfig(cfg)
+	// Initialize DynamORM factory
+	dynamormConfig := session.Config{
+		Region: cfg.Region,
+	}
 
-	// Initialize storage components
-	requestQueue := store.NewRequestQueue(dynamoClient, requestsTable)
-	connectionStore := store.NewConnectionStore(dynamoClient, connectionsTable)
+	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	if err != nil {
+		logger.Fatalf("Failed to create DynamORM store factory: %v", err)
+	}
+
+	// Get storage components from factory
+	requestQueue := storeFactory.RequestQueue()
+	connectionStore := storeFactory.ConnectionStore()
 
 	// Initialize API Gateway Management API client
 	apiGatewayEndpoint := os.Getenv("WEBSOCKET_ENDPOINT")
@@ -66,8 +61,11 @@ func init() {
 		o.BaseEndpoint = &apiGatewayEndpoint
 	})
 
+	// Wrap the AWS SDK client with the adapter
+	apiGatewayAdapter := connection.NewAWSAPIGatewayAdapter(apiGatewayClient)
+
 	// Create real ConnectionManager from Team 1
-	connManager := connection.NewManager(connectionStore, apiGatewayClient, apiGatewayEndpoint)
+	connManager := connection.NewManager(connectionStore, apiGatewayAdapter, apiGatewayEndpoint)
 	connManager.SetLogger(logger.Printf)
 
 	// Create executor
