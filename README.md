@@ -10,8 +10,7 @@
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#documentation">Documentation</a> •
-  <a href="#the-9-hour-story">The 9-Hour Story</a>
+  <a href="#documentation">Documentation</a>
 </p>
 
 ## Overview
