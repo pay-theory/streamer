@@ -66,6 +66,8 @@ temp/
 streamer
 main
 
+
+!pkg/streamer
 # AWS credentials
 .aws/
 
