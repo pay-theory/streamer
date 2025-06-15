@@ -54,7 +54,5 @@ func main() {
 
 	fmt.Printf("Demo setup complete!\n")
 	fmt.Printf("Connection ID: %s\n", connectionID)
-	fmt.Printf("User ID: %s\n", userID)
-	fmt.Printf("Tenant ID: %s\n", tenantID)
 	fmt.Printf("\nUse this connection ID in your WebSocket client\n")
 }

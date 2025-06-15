@@ -184,7 +184,6 @@ func (s *connectionStore) DeleteStale(ctx context.Context, before time.Time) err
 	for i := range connections {
 		if err := s.Delete(ctx, connections[i].ConnectionID); err != nil {
 			// Log error but continue with other deletions
-			fmt.Printf("Failed to delete stale connection %s: %v\n", connections[i].ConnectionID, err)
 		} else {
 			deleteCount++
 		}

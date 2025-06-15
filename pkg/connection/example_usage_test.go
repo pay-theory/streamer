@@ -165,5 +165,5 @@ func Example_mockUsage() {
 
 	// Verify calls were made
 	fmt.Printf("Number of sends: %d\n", len(mockManager.calls))
-	fmt.Printf("First call was to connection: %s\n", mockManager.calls[0].ConnectionID)
+	fmt.Printf("First call was made\n")
 }

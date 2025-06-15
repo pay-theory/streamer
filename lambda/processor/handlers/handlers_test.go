@@ -303,8 +303,7 @@ func TestDataProcessorHandler(t *testing.T) {
 		// Verify progress through pipeline stages
 		updates := reporter.getUpdates()
 
-		// Log messages for debugging
-		t.Logf("Progress messages received:")
+		// Progress messages received during test
 		for _, update := range updates {
 			t.Logf("  %.0f%%: %s", update.percentage, update.message)
 		}

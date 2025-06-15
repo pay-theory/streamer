@@ -93,7 +93,6 @@ func (q *requestQueue) UpdateStatus(ctx context.Context, requestID string, statu
 	oldReq.SetKeys()
 	if err := q.db.Model(oldReq).Delete(); err != nil {
 		// Log but don't fail
-		fmt.Printf("Failed to delete old status entry: %v\n", err)
 	}
 
 	// Create new status entry
@@ -246,7 +245,6 @@ func (q *requestQueue) Dequeue(ctx context.Context, limit int) ([]*store.AsyncRe
 	for _, req := range requests {
 		if err := q.UpdateStatus(ctx, req.RequestID, store.StatusProcessing, "Dequeued for processing"); err != nil {
 			// Log error but continue
-			fmt.Printf("Failed to update status for request %s: %v\n", req.RequestID, err)
 		}
 	}
 

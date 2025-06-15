@@ -1,6 +1,6 @@
 module github.com/pay-theory/streamer
 
-go 1.23.9
+go 1.23.10
 
 require (
 	github.com/aws/aws-lambda-go v1.49.0
@@ -14,8 +14,8 @@ require (
 	github.com/aws/smithy-go v1.22.3
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
-	github.com/pay-theory/dynamorm v1.0.17
-	github.com/pay-theory/lift v1.0.19
+	github.com/pay-theory/dynamorm v1.0.18
+	github.com/pay-theory/lift v1.0.21
 	github.com/stretchr/testify v1.10.0
 )
 

@@ -2,7 +2,6 @@ package progress
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 )
@@ -63,8 +62,8 @@ func (r *DefaultReporter) Report(percentage float64, message string) error {
 	// Check if connection is still active
 	ctx := context.Background()
 	if !r.connManager.IsActive(ctx, r.connectionID) {
-		log.Printf("[Progress] Connection %s no longer active for request %s", r.connectionID, r.requestID)
-		return nil // Don't fail the whole process
+		// Connection no longer active, silently return
+		return nil
 	}
 
 	update := map[string]interface{}{
@@ -79,13 +78,9 @@ func (r *DefaultReporter) Report(percentage float64, message string) error {
 		update["metadata"] = r.metadata
 	}
 
-	// Log the message being sent for debugging
-	log.Printf("[Progress] Sending update for request %s: %.0f%% - %s", r.requestID, percentage, message)
-
 	// Send via connection manager
 	err := r.connManager.Send(ctx, r.connectionID, update)
 	if err != nil {
-		log.Printf("[Progress] Failed to send update for request %s: %v", r.requestID, err)
 		// Don't return error to avoid failing the whole process
 		return nil
 	}

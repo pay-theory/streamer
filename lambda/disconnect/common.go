@@ -67,9 +67,6 @@ func (m *MetricsLogger) LogDisconnect(ctx context.Context, metrics *DisconnectMe
 	// Format as JSON for CloudWatch Insights
 	data := map[string]interface{}{
 		"event_type":              "connection_disconnected",
-		"connection_id":           metrics.ConnectionID,
-		"user_id":                 metrics.UserID,
-		"tenant_id":               metrics.TenantID,
 		"disconnect_reason":       metrics.DisconnectReason,
 		"duration_seconds":        metrics.DurationSeconds,
 		"messages_sent":           metrics.MessagesSent,

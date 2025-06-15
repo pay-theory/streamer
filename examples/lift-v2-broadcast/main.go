@@ -44,10 +44,7 @@ func main() {
 
 // handleViewerConnect processes new WebSocket connections
 func handleViewerConnect(ctx *lift.Context) error {
-	// In a real implementation with JWT middleware, you would get user ID from claims:
-	// userID := ctx.UserID()
-	// tenantID := ctx.TenantID()
-
+	// In a real implementation with JWT middleware, you would get user ID from claims
 	userID, _ := ctx.Get("userId").(string)
 	if userID == "" {
 		// For this example, we'll use a placeholder
@@ -58,7 +55,7 @@ func handleViewerConnect(ctx *lift.Context) error {
 	ctx.Set("streams", []string{}) // Streams the user is watching
 	ctx.Set("is_host", false)
 
-	log.Printf("Viewer connected: %s", userID)
+	log.Printf("Viewer connected")
 
 	return ctx.Status(200).JSON(map[string]interface{}{
 		"status": "connected",
@@ -79,7 +76,7 @@ func handleStreamStart(ctx *lift.Context) error {
 	// 3. Broadcast to all connected users
 	// 4. Set up stream metadata
 
-	log.Printf("Stream started by user: %s", userID)
+	log.Printf("Stream started")
 
 	return ctx.Status(200).JSON(map[string]interface{}{
 		"status":   "stream_started",
@@ -102,7 +99,7 @@ func handleStreamJoin(ctx *lift.Context) error {
 	// 4. Update viewer count
 	// 5. Notify other participants
 
-	log.Printf("User %s joined a stream", userID)
+	log.Printf("User joined stream")
 
 	return ctx.Status(200).JSON(map[string]interface{}{
 		"status":  "joined",
@@ -123,7 +120,7 @@ func handleChatMessage(ctx *lift.Context) error {
 	// 3. Broadcast message to all stream viewers
 	// 4. Store message history if needed
 
-	log.Printf("Chat message from user: %s", userID)
+	log.Printf("Chat message received")
 
 	return ctx.Status(200).JSON(map[string]interface{}{
 		"status":  "sent",
@@ -144,7 +141,7 @@ func handleViewerDisconnect(ctx *lift.Context) error {
 	// 3. Notify other participants
 	// 4. Clean up user data
 
-	log.Printf("Viewer disconnected: %s", userID)
+	log.Printf("Viewer disconnected")
 
 	return ctx.Status(200).JSON(map[string]interface{}{
 		"status": "disconnected",

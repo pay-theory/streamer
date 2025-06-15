@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"time"
 
@@ -75,7 +74,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayWebsocketPr
 	conn, err := h.connStore.Get(ctx, connectionID)
 	if err != nil {
 		// Connection might already be deleted
-		log.Printf("Connection %s not found during disconnect: %v", connectionID, err)
 		metrics.ConnectionNotFound = true
 	} else {
 		// Calculate connection duration
@@ -96,7 +94,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayWebsocketPr
 
 	// Delete the connection record
 	if err := h.connStore.Delete(ctx, connectionID); err != nil {
-		log.Printf("Failed to delete connection %s: %v", connectionID, err)
 		metrics.DeleteError = err.Error()
 		// Don't return error - connection is already closed on API Gateway side
 	}
@@ -111,7 +108,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayWebsocketPr
 
 		// Delete all subscriptions for this connection
 		if err := h.subStore.DeleteByConnection(ctx, connectionID); err != nil {
-			log.Printf("Failed to delete subscriptions for connection %s: %v", connectionID, err)
 			metrics.SubscriptionError = err.Error()
 			// Don't return error - continue cleanup
 		}
@@ -121,7 +117,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayWebsocketPr
 	if h.requestStore != nil {
 		cancelledCount, err := h.requestStore.CancelByConnection(ctx, connectionID)
 		if err != nil {
-			log.Printf("Failed to cancel requests for connection %s: %v", connectionID, err)
 			metrics.RequestError = err.Error()
 		} else {
 			metrics.RequestsCancelled = cancelledCount
@@ -136,9 +131,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayWebsocketPr
 
 	// Log structured summary
 	h.logger.Info(ctx, "Disconnect completed", map[string]interface{}{
-		"connection_id":           connectionID,
-		"user_id":                 metrics.UserID,
-		"tenant_id":               metrics.TenantID,
 		"duration_seconds":        metrics.DurationSeconds,
 		"messages_sent":           metrics.MessagesSent,
 		"messages_received":       metrics.MessagesReceived,

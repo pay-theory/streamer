@@ -1,18 +1,16 @@
 package main
 
 import (
-    "fmt"
-    "time"
-    _ "github.com/pay-theory/streamer/lambda/connect"
-    _ "github.com/pay-theory/streamer/lambda/disconnect"
-    _ "github.com/pay-theory/streamer/lambda/router"
-    _ "github.com/pay-theory/streamer/lambda/processor"
+	"fmt"
+	"time"
+	// Removed lambda imports as they are main packages (executables) and cannot be imported
+	// If you need to measure lambda initialization, consider moving shared logic to importable packages
 )
 
 func main() {
-    start := time.Now()
-    // Simulate initialization
-    time.Sleep(1 * time.Millisecond)
-    duration := time.Since(start)
-    fmt.Printf("Package load time: %v\n", duration)
+	start := time.Now()
+	// Simulate initialization - measuring basic Go runtime initialization
+	time.Sleep(1 * time.Millisecond)
+	duration := time.Since(start)
+	fmt.Printf("Package load time: %v\n", duration)
 }

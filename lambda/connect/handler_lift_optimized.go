@@ -43,7 +43,7 @@ func (h *ConnectHandlerOptimized) HandleConnect(ctx *lift.Context) error {
 
 	if userID == "" {
 		// This shouldn't happen if JWT middleware is configured correctly
-		log.Printf("No user ID found for connection %s", connectionID)
+		log.Printf("No user ID found in JWT claims")
 		return ctx.Status(401).JSON(map[string]string{
 			"error": "Authentication required",
 			"code":  "UNAUTHORIZED",
@@ -71,7 +71,7 @@ func (h *ConnectHandlerOptimized) HandleConnect(ctx *lift.Context) error {
 			}
 		}
 		if !allowed {
-			log.Printf("Tenant not allowed for connection %s: %s", connectionID, tenantID)
+			log.Printf("Tenant not allowed")
 
 			// Metrics are handled by middleware, but we can still publish custom business metrics
 			h.publishAuthFailureMetric(context.Background(), "tenant_not_allowed", tenantID)
@@ -120,7 +120,7 @@ func (h *ConnectHandlerOptimized) HandleConnect(ctx *lift.Context) error {
 	// Save connection to store
 	err = h.store.Save(context.Background(), connection)
 	if err != nil {
-		log.Printf("Failed to save connection %s: %v", connectionID, err)
+		log.Printf("Failed to save connection: %v", err)
 		return ctx.Status(500).JSON(map[string]string{
 			"error": "Failed to establish connection",
 			"code":  "INTERNAL_ERROR",
@@ -128,8 +128,7 @@ func (h *ConnectHandlerOptimized) HandleConnect(ctx *lift.Context) error {
 	}
 
 	// Log successful connection (enhanced logging handled by middleware)
-	log.Printf("Connection established: connectionId=%s, userId=%s, tenantId=%s",
-		connectionID, connection.UserID, connection.TenantID)
+	log.Printf("Connection established successfully")
 
 	// Success metrics are handled by middleware automatically!
 	// We only publish custom business metrics

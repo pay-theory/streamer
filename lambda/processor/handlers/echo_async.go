@@ -63,8 +63,7 @@ func (h *EchoAsyncHandler) ProcessWithProgress(
 	for _, step := range steps {
 		// Report progress
 		if err := reporter.Report(step.percentage, step.message); err != nil {
-			// Log but don't fail
-			fmt.Printf("Failed to report progress: %v\n", err)
+			// Failed to report progress - continue processing
 		}
 
 		// Simulate work
