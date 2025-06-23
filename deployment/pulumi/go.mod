@@ -1,6 +1,6 @@
 module github.com/pay-theory/streamer/deployment/pulumi
 
-go 1.21
+go 1.22.0
 
 require (
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.0.0
@@ -14,7 +14,7 @@ require (
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cheggaaa/pb v1.0.18 // indirect
-	github.com/cloudflare/circl v1.3.7 // indirect
+	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/djherbis/times v1.2.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
