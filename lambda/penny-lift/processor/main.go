@@ -95,6 +95,10 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 			continue
 		}
 
+		// Debug logging
+		logger.Printf("Parsed AsyncRequest: ID=%s, Status=%s, Action=%s", 
+			asyncReq.RequestID, asyncReq.Status, asyncReq.Action)
+
 		// Skip if not in PENDING status
 		if asyncReq.Status != storedynamorm.StatusPending {
 			logger.Printf("Skipping request %s with status %s", asyncReq.RequestID, asyncReq.Status)

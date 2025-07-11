@@ -10,19 +10,19 @@ import (
 // Connection represents a WebSocket connection - single model serving both business and database needs
 type Connection struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk"`
-	SK string `dynamorm:"sk"`
+	PK string `dynamorm:"PK"`
+	SK string `dynamorm:"SK"`
 
 	// Connection data with proper attribute mapping
-	ConnectionID string    `dynamorm:"attr:connection_id" json:"connectionId"`
-	UserID       string    `dynamorm:"attr:user_id" json:"userId" dynamorm-index:"user-index,pk"`
-	TenantID     string    `dynamorm:"attr:tenant_id" json:"tenantId" dynamorm-index:"tenant-index,pk"`
-	Endpoint     string    `dynamorm:"attr:endpoint" json:"endpoint"`
-	ConnectedAt  time.Time `dynamorm:"attr:connected_at" json:"connectedAt"`
-	LastPing     time.Time `dynamorm:"attr:last_ping" json:"lastPing"`
+	ConnectionID string    `dynamorm:"connection_id" json:"connectionId"`
+	UserID       string    `dynamorm:"user_id" json:"userId" dynamorm-index:"user-index,pk"`
+	TenantID     string    `dynamorm:"tenant_id" json:"tenantId" dynamorm-index:"tenant-index,pk"`
+	Endpoint     string    `dynamorm:"endpoint" json:"endpoint"`
+	ConnectedAt  time.Time `dynamorm:"connected_at" json:"connectedAt"`
+	LastPing     time.Time `dynamorm:"last_ping" json:"lastPing"`
 
 	// Metadata for storing additional information
-	Metadata map[string]string `dynamorm:"attr:metadata,omitempty" json:"metadata,omitempty"`
+	Metadata map[string]string `dynamorm:"metadata,omitempty" json:"metadata,omitempty"`
 
 	// DynamORM managed fields
 	CreatedAt time.Time `dynamorm:"created_at" json:"createdAt"`
@@ -30,7 +30,7 @@ type Connection struct {
 	Version   int       `dynamorm:"version" json:"version"`
 
 	// TTL for automatic cleanup
-	TTL int64 `dynamorm:"attr:ttl,omitempty" json:"ttl,omitempty"`
+	TTL int64 `dynamorm:"ttl,omitempty" json:"ttl,omitempty"`
 }
 
 // TableName returns the DynamoDB table name
@@ -59,37 +59,37 @@ const (
 // AsyncRequest represents a queued async request - single model serving both business and database needs
 type AsyncRequest struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk"`
-	SK string `dynamorm:"sk"`
+	PK string `dynamorm:"PK"`
+	SK string `dynamorm:"SK"`
 
 	// Request data with proper attribute mapping
-	RequestID    string                 `dynamorm:"attr:request_id" json:"requestId"`
-	ConnectionID string                 `dynamorm:"attr:connection_id" json:"connectionId" dynamorm-index:"connection-index,pk"`
-	Status       RequestStatus          `dynamorm:"attr:status" json:"status" dynamorm-index:"status-index,sk"`
-	Action       string                 `dynamorm:"attr:action" json:"action"`
-	Payload      map[string]interface{} `dynamorm:"attr:payload,omitempty" json:"payload,omitempty"`
+	RequestID    string                 `dynamorm:"request_id" json:"requestId"`
+	ConnectionID string                 `dynamorm:"connection_id" json:"connectionId" dynamorm-index:"connection-index,pk"`
+	Status       RequestStatus          `dynamorm:"status" json:"status" dynamorm-index:"status-index,sk"`
+	Action       string                 `dynamorm:"action" json:"action"`
+	Payload      map[string]interface{} `dynamorm:"payload,omitempty" json:"payload,omitempty"`
 
 	// Processing information
-	ProcessingStarted *time.Time `dynamorm:"attr:processing_started,omitempty" json:"processingStarted,omitempty"`
-	ProcessingEnded   *time.Time `dynamorm:"attr:processing_ended,omitempty" json:"processingEnded,omitempty"`
+	ProcessingStarted *time.Time `dynamorm:"processing_started,omitempty" json:"processingStarted,omitempty"`
+	ProcessingEnded   *time.Time `dynamorm:"processing_ended,omitempty" json:"processingEnded,omitempty"`
 
 	// Result or error
-	Result map[string]interface{} `dynamorm:"attr:result,omitempty" json:"result,omitempty"`
-	Error  string                 `dynamorm:"attr:error,omitempty" json:"error,omitempty"`
+	Result map[string]interface{} `dynamorm:"result,omitempty" json:"result,omitempty"`
+	Error  string                 `dynamorm:"error,omitempty" json:"error,omitempty"`
 
 	// Progress tracking
-	Progress        float64                `dynamorm:"attr:progress" json:"progress"`
-	ProgressMessage string                 `dynamorm:"attr:progress_message,omitempty" json:"progressMessage,omitempty"`
-	ProgressDetails map[string]interface{} `dynamorm:"attr:progress_details,omitempty" json:"progressDetails,omitempty"`
+	Progress        float64                `dynamorm:"progress" json:"progress"`
+	ProgressMessage string                 `dynamorm:"progress_message,omitempty" json:"progressMessage,omitempty"`
+	ProgressDetails map[string]interface{} `dynamorm:"progress_details,omitempty" json:"progressDetails,omitempty"`
 
 	// Retry information
-	RetryCount int       `dynamorm:"attr:retry_count" json:"retryCount"`
-	MaxRetries int       `dynamorm:"attr:max_retries" json:"maxRetries"`
-	RetryAfter time.Time `dynamorm:"attr:retry_after,omitempty" json:"retryAfter,omitempty"`
+	RetryCount int       `dynamorm:"retry_count" json:"retryCount"`
+	MaxRetries int       `dynamorm:"max_retries" json:"maxRetries"`
+	RetryAfter time.Time `dynamorm:"retry_after,omitempty" json:"retryAfter,omitempty"`
 
 	// User and tenant for querying
-	UserID   string `dynamorm:"attr:user_id" json:"userId" dynamorm-index:"user-index,sk"`
-	TenantID string `dynamorm:"attr:tenant_id" json:"tenantId" dynamorm-index:"tenant-index,sk"`
+	UserID   string `dynamorm:"user_id" json:"userId" dynamorm-index:"user-index,sk"`
+	TenantID string `dynamorm:"tenant_id" json:"tenantId" dynamorm-index:"tenant-index,sk"`
 
 	// DynamORM managed fields
 	CreatedAt time.Time `dynamorm:"created_at" json:"createdAt"`
@@ -97,7 +97,7 @@ type AsyncRequest struct {
 	Version   int       `dynamorm:"version" json:"version"`
 
 	// TTL for automatic cleanup
-	TTL int64 `dynamorm:"attr:ttl,omitempty" json:"ttl,omitempty"`
+	TTL int64 `dynamorm:"ttl,omitempty" json:"ttl,omitempty"`
 }
 
 // TableName returns the DynamoDB table name
@@ -114,14 +114,14 @@ func (r *AsyncRequest) SetKeys() {
 // Subscription represents a real-time update subscription - single model serving both business and database needs
 type Subscription struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk"`
-	SK string `dynamorm:"sk"`
+	PK string `dynamorm:"PK"`
+	SK string `dynamorm:"SK"`
 
 	// Subscription data with proper attribute mapping
-	SubscriptionID string   `dynamorm:"attr:subscription_id" json:"subscriptionId"`
-	ConnectionID   string   `dynamorm:"attr:connection_id" json:"connectionId" dynamorm-index:"connection-index,pk"`
-	RequestID      string   `dynamorm:"attr:request_id" json:"requestId" dynamorm-index:"request-index,pk"`
-	EventTypes     []string `dynamorm:"attr:event_types,stringset" json:"eventTypes"`
+	SubscriptionID string   `dynamorm:"subscription_id" json:"subscriptionId"`
+	ConnectionID   string   `dynamorm:"connection_id" json:"connectionId" dynamorm-index:"connection-index,pk"`
+	RequestID      string   `dynamorm:"request_id" json:"requestId" dynamorm-index:"request-index,pk"`
+	EventTypes     []string `dynamorm:"event_types,stringset" json:"eventTypes"`
 
 	// DynamORM managed fields
 	CreatedAt time.Time `dynamorm:"created_at" json:"createdAt"`
@@ -129,7 +129,7 @@ type Subscription struct {
 	Version   int       `dynamorm:"version" json:"version"`
 
 	// TTL for automatic cleanup
-	TTL int64 `dynamorm:"attr:ttl,omitempty" json:"ttl,omitempty"`
+	TTL int64 `dynamorm:"ttl,omitempty" json:"ttl,omitempty"`
 }
 
 // TableName returns the DynamoDB table name
