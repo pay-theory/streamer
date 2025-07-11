@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,12 +10,11 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
+	"github.com/pay-theory/dynamorm"
 	"github.com/pay-theory/dynamorm/pkg/session"
 
-	"github.com/pay-theory/streamer/internal/store"
-	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/lambda/processor/executor"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/streamer"
@@ -44,14 +42,14 @@ func init() {
 		Region: cfg.Region,
 	}
 
-	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	storeFactory, err := storedynamorm.NewStoreFactory(dynamormConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create DynamORM store factory: %v", err)
 	}
 
 	// Get storage components from factory
-	requestQueue := storeFactory.RequestQueue()
 	connectionStore := storeFactory.ConnectionStore()
+	db := storeFactory.DB()
 
 	// Initialize API Gateway Management API client
 	apiGatewayEndpoint := os.Getenv("WEBSOCKET_ENDPOINT")
@@ -70,8 +68,8 @@ func init() {
 	connManager := connection.NewManager(connectionStore, apiGatewayAdapter, apiGatewayEndpoint)
 	connManager.SetLogger(logger.Printf)
 
-	// Create executor
-	exec = executor.New(connManager, requestQueue, logger)
+	// Create executor with DynamORM database instance
+	exec = executor.New(connManager, db, logger)
 
 	// Register async handlers
 	if err := registerAsyncHandlers(exec); err != nil {
@@ -98,7 +96,7 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 		}
 
 		// Skip if not in PENDING status
-		if asyncReq.Status != store.StatusPending {
+		if asyncReq.Status != storedynamorm.StatusPending {
 			logger.Printf("Skipping request %s with status %s", asyncReq.RequestID, asyncReq.Status)
 			continue
 		}
@@ -119,38 +117,17 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 	return nil
 }
 
-// parseAsyncRequest converts a DynamoDB stream record to an AsyncRequest
-func parseAsyncRequest(record events.DynamoDBEventRecord) (*store.AsyncRequest, error) {
+// parseAsyncRequest converts a DynamoDB stream record to an AsyncRequest using DynamORM's stream support
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*storedynamorm.AsyncRequest, error) {
 	// For INSERT events, use NewImage; for MODIFY events, use NewImage as well
 	image := record.Change.NewImage
 	if image == nil {
 		return nil, nil
 	}
 
-	// Convert DynamoDB event attribute values to a regular map
-	imageMap := make(map[string]interface{})
-	for k, v := range image {
-		var val interface{}
-		jsonBytes, err := v.MarshalJSON()
-		if err != nil {
-			logger.Printf("Failed to marshal attribute %s: %v", k, err)
-			continue
-		}
-		if err := json.Unmarshal(jsonBytes, &val); err != nil {
-			logger.Printf("Failed to unmarshal attribute %s: %v", k, err)
-			continue
-		}
-		imageMap[k] = val
-	}
-
-	// Convert to AsyncRequest struct
-	jsonBytes, err := json.Marshal(imageMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal image map: %w", err)
-	}
-
-	var asyncReq store.AsyncRequest
-	if err := json.Unmarshal(jsonBytes, &asyncReq); err != nil {
+	// Use DynamORM's native stream support
+	var asyncReq storedynamorm.AsyncRequest
+	if err := dynamorm.UnmarshalStreamImage(image, &asyncReq); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
 	}
 

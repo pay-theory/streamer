@@ -14,10 +14,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/pay-theory/dynamorm"
 	"github.com/pay-theory/dynamorm/pkg/session"
 
-	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/lambda/processor/executor"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/streamer"
@@ -43,7 +43,7 @@ func init() {
 		Region: cfg.Region,
 	}
 
-	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	storeFactory, err := storedynamorm.NewStoreFactory(dynamormConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create DynamORM store factory: %v", err)
 	}
@@ -107,7 +107,7 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 		}
 
 		// Only process pending requests
-		if asyncReq.Status != dynamorm.StatusPending {
+		if asyncReq.Status != storedynamorm.StatusPending {
 			logger.Printf("Skipping request %s with status %s", asyncReq.RequestID, asyncReq.Status)
 			continue
 		}
@@ -126,15 +126,15 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 }
 
 // parseAsyncRequest demonstrates proper DynamORM stream parsing
-func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*storedynamorm.AsyncRequest, error) {
 	image := record.Change.NewImage
 	if image == nil {
 		return nil, nil
 	}
 
-	// Use AWS SDK attributevalue marshaler as fallback until DynamORM API is clarified
-	var asyncReq dynamorm.AsyncRequest
-	if err := attributevalue.UnmarshalMap(image, &asyncReq); err != nil {
+	// Use DynamORM's native stream support
+	var asyncReq storedynamorm.AsyncRequest
+	if err := dynamorm.UnmarshalStreamImage(image, &asyncReq); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
 	}
 

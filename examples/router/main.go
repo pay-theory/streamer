@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	router *streamer.Router
+	router streamer.Router
 	logger *log.Logger
 )
 
@@ -75,7 +75,7 @@ func init() {
 }
 
 // registerRouterHandlers demonstrates registering handlers with the router
-func registerRouterHandlers(router *streamer.Router) {
+func registerRouterHandlers(router streamer.Router) {
 	// Fast sync handlers (processed immediately)
 	router.Handle("ping", NewPingHandler())
 	router.Handle("echo", streamer.NewEchoHandler())

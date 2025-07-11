@@ -11,11 +11,10 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/pay-theory/dynamorm"
 	"github.com/pay-theory/dynamorm/pkg/session"
 
-	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/lambda/processor/executor"
 	"github.com/pay-theory/streamer/lambda/processor/handlers"
 	"github.com/pay-theory/streamer/pkg/connection"
@@ -42,7 +41,7 @@ func init() {
 		Region: cfg.Region,
 	}
 
-	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	storeFactory, err := storedynamorm.NewStoreFactory(dynamormConfig)
 	if err != nil {
 		logger.Fatalf("Failed to create DynamORM store factory: %v", err)
 	}
@@ -95,7 +94,7 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 		}
 
 		// Skip if not in PENDING status
-		if asyncReq.Status != dynamorm.StatusPending {
+		if asyncReq.Status != storedynamorm.StatusPending {
 			logger.Printf("Skipping request %s with status %s", asyncReq.RequestID, asyncReq.Status)
 			continue
 		}
@@ -118,72 +117,23 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
 	return nil
 }
 
-// parseAsyncRequest converts a DynamoDB stream record to an AsyncRequest using DynamORM's SafeMarshaler
-func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+// parseAsyncRequest converts a DynamoDB stream record to an AsyncRequest using DynamORM's stream support
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*storedynamorm.AsyncRequest, error) {
 	// For INSERT events, use NewImage; for MODIFY events, use NewImage as well
 	image := record.Change.NewImage
 	if image == nil {
 		return nil, nil
 	}
 
-	// Convert events.DynamoDBAttributeValue to types.AttributeValue
-	attribs := make(map[string]types.AttributeValue)
-	for k, v := range image {
-		attribs[k] = convertDynamoDBAttributeValue(v)
-	}
-
-	// Use AWS SDK attributevalue marshaler as fallback until DynamORM API is clarified
-	var asyncReq dynamorm.AsyncRequest
-	if err := attributevalue.UnmarshalMap(attribs, &asyncReq); err != nil {
+	// Use DynamORM's native stream support
+	var asyncReq storedynamorm.AsyncRequest
+	if err := dynamorm.UnmarshalStreamImage(image, &asyncReq); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
 	}
 
 	return &asyncReq, nil
 }
 
-// convertDynamoDBAttributeValue converts events.DynamoDBAttributeValue to types.AttributeValue
-func convertDynamoDBAttributeValue(eventVal events.DynamoDBAttributeValue) types.AttributeValue {
-	if eventVal.IsNull() {
-		return &types.AttributeValueMemberNULL{Value: true}
-	}
-	if s := eventVal.String(); s != "" {
-		return &types.AttributeValueMemberS{Value: s}
-	}
-	if n := eventVal.Number(); n != "" {
-		return &types.AttributeValueMemberN{Value: n}
-	}
-	if b := eventVal.Binary(); b != nil {
-		return &types.AttributeValueMemberB{Value: b}
-	}
-	if ss := eventVal.StringSet(); ss != nil {
-		return &types.AttributeValueMemberSS{Value: ss}
-	}
-	if ns := eventVal.NumberSet(); ns != nil {
-		return &types.AttributeValueMemberNS{Value: ns}
-	}
-	if bs := eventVal.BinarySet(); bs != nil {
-		return &types.AttributeValueMemberBS{Value: bs}
-	}
-	if m := eventVal.Map(); m != nil {
-		converted := make(map[string]types.AttributeValue)
-		for k, v := range m {
-			converted[k] = convertDynamoDBAttributeValue(v)
-		}
-		return &types.AttributeValueMemberM{Value: converted}
-	}
-	if l := eventVal.List(); l != nil {
-		converted := make([]types.AttributeValue, len(l))
-		for i, v := range l {
-			converted[i] = convertDynamoDBAttributeValue(v)
-		}
-		return &types.AttributeValueMemberL{Value: converted}
-	}
-	if eventVal.DataType() == events.DataTypeBoolean {
-		b := eventVal.Boolean()
-		return &types.AttributeValueMemberBOOL{Value: b}
-	}
-	return &types.AttributeValueMemberNULL{Value: true}
-}
 
 func registerAsyncHandlers(exec *executor.AsyncExecutor) error {
 	// Register handlers from the router package

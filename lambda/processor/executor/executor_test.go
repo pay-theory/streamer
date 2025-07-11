@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pay-theory/dynamorm/pkg/core"
+	dynamocks "github.com/pay-theory/dynamorm/pkg/mocks"
 	"github.com/pay-theory/streamer/internal/store"
+	storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/streamer"
 	"github.com/stretchr/testify/assert"
@@ -19,12 +22,12 @@ import (
 // following CENTRALIZED_MOCKS.md architecture
 
 // Helper to create executor for testing
-func createTestExecutor(mockQueue store.RequestQueue, logger *log.Logger) *AsyncExecutor {
+func createTestExecutor(mockDB core.DB, logger *log.Logger) *AsyncExecutor {
 	// For testing purposes, we can use nil for connection manager
 	// since the progress reporter will handle the nil case
 	return &AsyncExecutor{
 		connManager:      nil,
-		requestQueue:     mockQueue,
+		db:               mockDB,
 		handlers:         make(map[string]streamer.Handler),
 		progressHandlers: make(map[string]streamer.HandlerWithProgress),
 		logger:           logger,
