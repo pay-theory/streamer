@@ -2,9 +2,11 @@
 
 > **For Development Teams**: Complete guide to integrating Streamer for async request processing
 
+**🔥 Updated for DynamORM Single-Model Architecture**
+
 ## Overview
 
-Streamer enables your applications to handle long-running operations (>5 seconds) by providing an async request/response pattern with real-time progress updates via WebSocket. This guide will help your team integrate Streamer quickly and effectively.
+Streamer enables your applications to handle long-running operations (>5 seconds) by providing an async request/response pattern with real-time progress updates via WebSocket. This guide reflects the updated DynamORM architecture using single models for both business logic and database operations.
 
 ## Integration Scenarios
 
@@ -118,7 +120,7 @@ func (h *DataExportHandler) ProcessWithProgress(
 }
 ```
 
-### 3. Set Up Infrastructure
+### 3. Set Up Infrastructure with DynamORM
 
 Use the provided Pulumi templates or deploy manually:
 
@@ -130,13 +132,34 @@ cp Pulumi.dev.yaml.template Pulumi.yourenv.yaml
 pulumi up -s yourenv
 ```
 
-### 4. Register Handlers
+### 4. Initialize DynamORM Components
 
 In your Lambda router function:
 
 ```go
+import (
+    "github.com/pay-theory/dynamorm/pkg/session"
+    "github.com/pay-theory/streamer/internal/store/dynamorm"
+    "github.com/pay-theory/streamer/pkg/connection"
+    "github.com/pay-theory/streamer/pkg/streamer"
+)
+
 func init() {
-    router = streamer.NewRouter(requestQueue, connectionManager)
+    // Create DynamORM factory
+    dynamormConfig := session.Config{Region: "us-east-1"}
+    factory, err := dynamorm.NewStoreFactory(dynamormConfig)
+    if err != nil {
+        log.Fatalf("Failed to create DynamORM factory: %v", err)
+    }
+
+    // Create connection manager
+    apiGatewayAdapter := connection.NewAWSAPIGatewayAdapter(apiGatewayClient)
+    connManager := connection.NewManager(factory.ConnectionStore(), apiGatewayAdapter, endpoint)
+
+    // Create router with queue adapter
+    queueAdapter := streamer.NewRequestQueueAdapter(factory.RequestQueue())
+    router = streamer.NewRouter(queueAdapter, connManager)
+    router.SetAsyncThreshold(5 * time.Second)
     
     // Register your handlers
     router.Handle("export_data", &DataExportHandler{
@@ -149,7 +172,85 @@ func init() {
 }
 ```
 
-### 5. Client Integration
+### 5. Set Up Async Processor
+
+In your Lambda processor function:
+
+```go
+import (
+    "github.com/pay-theory/dynamorm/pkg/marshal"
+    "github.com/pay-theory/streamer/internal/store/dynamorm"
+    "github.com/pay-theory/streamer/lambda/processor/executor"
+)
+
+var exec *executor.AsyncExecutor
+
+func init() {
+    // Create DynamORM factory
+    factory, err := dynamorm.NewStoreFactory(dynamormConfig)
+    if err != nil {
+        log.Fatalf("Failed to create DynamORM factory: %v", err)
+    }
+
+    // Create connection manager for progress updates
+    connManager := connection.NewManager(factory.ConnectionStore(), apiGatewayAdapter, endpoint)
+
+    // Create AsyncExecutor with DynamORM database
+    exec = executor.New(connManager, factory.DB(), logger)
+
+    // Register the same handlers for async processing
+    exec.RegisterHandler("export_data", &DataExportHandler{
+        db:       database.New(),
+        s3Client: s3.New(),
+    })
+    exec.RegisterHandler("generate_report", &ReportHandler{})
+}
+
+// DynamoDB stream handler using DynamORM marshaler
+func handler(ctx context.Context, event events.DynamoDBEvent) error {
+    for _, record := range event.Records {
+        if record.EventName != "INSERT" && record.EventName != "MODIFY" {
+            continue
+        }
+
+        // ✅ Use DynamORM's SafeMarshaler (not broken JSON approach)
+        asyncReq, err := parseAsyncRequest(record)
+        if err != nil || asyncReq == nil {
+            continue
+        }
+
+        if asyncReq.Status != dynamorm.StatusPending {
+            continue
+        }
+
+        // Process with retry logic
+        err = exec.ProcessWithRetry(ctx, asyncReq)
+        if err != nil {
+            log.Printf("Failed to process request: %v", err)
+        }
+    }
+    return nil
+}
+
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+    image := record.Change.NewImage
+    if image == nil {
+        return nil, nil
+    }
+
+    // Use DynamORM's SafeMarshaler for proper conversion
+    marshaler := marshal.NewSafeMarshaler()
+    
+    var asyncReq dynamorm.AsyncRequest
+    if err := marshaler.UnmarshalItem(image, &asyncReq); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
+    }
+
+    return &asyncReq, nil
+}
+```
+
+### 6. Client Integration
 
 #### Frontend (JavaScript/React)
 

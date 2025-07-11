@@ -1,0 +1,173 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/apigatewaymanagementapi"
+	"github.com/pay-theory/dynamorm/pkg/session"
+
+	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	"github.com/pay-theory/streamer/lambda/processor/executor"
+	"github.com/pay-theory/streamer/pkg/connection"
+	"github.com/pay-theory/streamer/pkg/streamer"
+	
+	"github.com/pay-theory/streamer/lambda/penny-lift/processor/handlers"
+)
+
+var (
+	exec   *executor.AsyncExecutor
+	logger *log.Logger
+)
+
+func init() {
+	logger = log.New(os.Stdout, "[PROCESSOR] ", log.LstdFlags|log.Lshortfile)
+
+	// Initialize AWS config
+	ctx := context.Background()
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		logger.Fatalf("Failed to load AWS config: %v", err)
+	}
+
+	// Initialize DynamORM factory
+	dynamormConfig := session.Config{
+		Region: cfg.Region,
+	}
+
+	storeFactory, err := dynamorm.NewStoreFactory(dynamormConfig)
+	if err != nil {
+		logger.Fatalf("Failed to create DynamORM store factory: %v", err)
+	}
+
+	// Get storage components from factory
+	requestQueue := storeFactory.RequestQueue()
+	connectionStore := storeFactory.ConnectionStore()
+
+	// Initialize API Gateway Management API client
+	apiGatewayEndpoint := os.Getenv("WEBSOCKET_ENDPOINT")
+	if apiGatewayEndpoint == "" {
+		logger.Fatal("WEBSOCKET_ENDPOINT environment variable is required")
+	}
+
+	apiGatewayClient := apigatewaymanagementapi.NewFromConfig(cfg, func(o *apigatewaymanagementapi.Options) {
+		o.BaseEndpoint = &apiGatewayEndpoint
+	})
+
+	// Wrap the AWS SDK client with the adapter
+	apiGatewayAdapter := connection.NewAWSAPIGatewayAdapter(apiGatewayClient)
+
+	// Create ConnectionManager
+	connManager := connection.NewManager(connectionStore, apiGatewayAdapter, apiGatewayEndpoint)
+	connManager.SetLogger(logger.Printf)
+
+	// Create executor
+	exec = executor.New(connManager, requestQueue, logger)
+
+	// Register async handlers
+	if err := registerAsyncHandlers(exec); err != nil {
+		logger.Fatalf("Failed to register handlers: %v", err)
+	}
+
+	logger.Println("Processor Lambda initialized successfully")
+}
+
+func handler(ctx context.Context, event events.DynamoDBEvent) error {
+	logger.Printf("Processing %d stream records", len(event.Records))
+
+	for _, record := range event.Records {
+		// Only process INSERT and MODIFY events for async requests
+		if record.EventName != "INSERT" && record.EventName != "MODIFY" {
+			continue
+		}
+
+		// Parse the AsyncRequest from DynamoDB stream
+		asyncReq, err := parseAsyncRequest(record)
+		if err != nil {
+			logger.Printf("Failed to parse AsyncRequest: %v", err)
+			continue
+		}
+
+		// Skip if not in PENDING status
+		if asyncReq.Status != store.StatusPending {
+			logger.Printf("Skipping request %s with status %s", asyncReq.RequestID, asyncReq.Status)
+			continue
+		}
+
+		// Create context with timeout (Lambda max is 15 minutes, leave 1 minute buffer)
+		processCtx, cancel := context.WithTimeout(ctx, 14*time.Minute)
+
+		// Process the request with retry logic
+		err = exec.ProcessWithRetry(processCtx, asyncReq)
+
+		cancel()
+
+		if err != nil {
+			logger.Printf("Failed to process request %s: %v", asyncReq.RequestID, err)
+		}
+	}
+
+	return nil
+}
+
+// parseAsyncRequest converts a DynamoDB stream record to an AsyncRequest
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*store.AsyncRequest, error) {
+	// For INSERT events, use NewImage; for MODIFY events, use NewImage as well
+	image := record.Change.NewImage
+	if image == nil {
+		return nil, nil
+	}
+
+	// Convert DynamoDB event attribute values to a regular map
+	imageMap := make(map[string]interface{})
+	for k, v := range image {
+		var val interface{}
+		jsonBytes, err := v.MarshalJSON()
+		if err != nil {
+			logger.Printf("Failed to marshal attribute %s: %v", k, err)
+			continue
+		}
+		if err := json.Unmarshal(jsonBytes, &val); err != nil {
+			logger.Printf("Failed to unmarshal attribute %s: %v", k, err)
+			continue
+		}
+		imageMap[k] = val
+	}
+
+	// Convert to AsyncRequest struct
+	jsonBytes, err := json.Marshal(imageMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal image map: %w", err)
+	}
+
+	var asyncReq store.AsyncRequest
+	if err := json.Unmarshal(jsonBytes, &asyncReq); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
+	}
+
+	return &asyncReq, nil
+}
+
+func registerAsyncHandlers(exec *executor.AsyncExecutor) error {
+	// Register delay handler for testing
+	exec.RegisterHandler("delay", streamer.NewDelayHandler(30*time.Second))
+	
+	// Register Knowledge Base handler
+	exec.RegisterHandler("knowledge_query", handlers.NewKnowledgeBaseHandler())
+
+	logger.Printf("Registered %d async handlers", 2)
+	return nil
+}
+
+func main() {
+	lambda.Start(handler)
+}

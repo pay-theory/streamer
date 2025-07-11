@@ -128,7 +128,7 @@ func TestRequestQueue_Get_WithDynamORMMocks(t *testing.T) {
 							RequestID:    "req-123",
 							ConnectionID: "conn-456",
 							Action:       "test-action",
-							Status:       store.StatusPending,
+							Status:       dynamorm.StatusPending,
 						},
 					}
 				}).Return(nil)
@@ -219,7 +219,7 @@ func TestRequestQueue_UpdateStatus_WithDynamORMMocks(t *testing.T) {
 							RequestID:    "req-123",
 							ConnectionID: "conn-456",
 							Action:       "test-action",
-							Status:       store.StatusPending,
+							Status:       dynamorm.StatusPending,
 						},
 					}
 				}).Return(nil)
@@ -284,13 +284,13 @@ func TestRequestQueue_GetByConnection_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       store.StatusPending,
+				Status:       dynamorm.StatusPending,
 			},
 			{
 				RequestID:    "req-2",
 				ConnectionID: "conn-456",
 				Action:       "action-2",
-				Status:       store.StatusProcessing,
+				Status:       dynamorm.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -314,7 +314,7 @@ func TestRequestQueue_GetByStatus_WithDynamORMMocks(t *testing.T) {
 	// Setup mock for successful query
 	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Index", "status-index").Return(mockQuery)
-	mockQuery.On("Where", "status", "=", store.StatusPending).Return(mockQuery)
+	mockQuery.On("Where", "status", "=", dynamorm.StatusPending).Return(mockQuery)
 	mockQuery.On("Limit", 5).Return(mockQuery)
 	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
 		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
@@ -323,7 +323,7 @@ func TestRequestQueue_GetByStatus_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       store.StatusPending,
+				Status:       dynamorm.StatusPending,
 			},
 		}
 	}).Return(nil)
@@ -354,7 +354,7 @@ func TestRequestQueue_Delete_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       store.StatusCompleted,
+				Status:       dynamorm.StatusCompleted,
 			},
 		}
 	}).Return(nil)
@@ -385,7 +385,7 @@ func TestRequestQueue_UpdateProgress_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       store.StatusProcessing,
+				Status:       dynamorm.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -420,7 +420,7 @@ func TestRequestQueue_CompleteRequest_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       store.StatusProcessing,
+				Status:       dynamorm.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -452,7 +452,7 @@ func TestRequestQueue_FailRequest_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       store.StatusProcessing,
+				Status:       dynamorm.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -476,7 +476,7 @@ func TestRequestQueue_Dequeue_WithDynamORMMocks(t *testing.T) {
 	// Setup mock for GetByStatus call
 	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Index", "status-index").Return(mockQuery)
-	mockQuery.On("Where", "status", "=", store.StatusPending).Return(mockQuery)
+	mockQuery.On("Where", "status", "=", dynamorm.StatusPending).Return(mockQuery)
 	mockQuery.On("Limit", 5).Return(mockQuery)
 	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
 		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
@@ -485,13 +485,13 @@ func TestRequestQueue_Dequeue_WithDynamORMMocks(t *testing.T) {
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       store.StatusPending,
+				Status:       dynamorm.StatusPending,
 			},
 			{
 				RequestID:    "req-2",
 				ConnectionID: "conn-789",
 				Action:       "action-2",
-				Status:       store.StatusPending,
+				Status:       dynamorm.StatusPending,
 			},
 		}
 	}).Return(nil)

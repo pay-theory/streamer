@@ -89,7 +89,7 @@ func (q *requestQueue) UpdateStatus(ctx context.Context, requestID string, statu
 	}
 
 	// Delete old status entry
-	oldReq := &AsyncRequest{RequestID: requestID, Status: current.Status}
+	oldReq := &AsyncRequest{RequestID: requestID, Status: RequestStatus(current.Status)}
 	oldReq.SetKeys()
 	if err := q.db.Model(oldReq).Delete(); err != nil {
 		// Log but don't fail
@@ -98,7 +98,7 @@ func (q *requestQueue) UpdateStatus(ctx context.Context, requestID string, statu
 	// Create new status entry
 	newReq := &AsyncRequest{}
 	newReq.FromStoreModel(current)
-	newReq.Status = status
+	newReq.Status = RequestStatus(status)
 	newReq.SetKeys()
 
 	if err := q.db.Model(newReq).Create(); err != nil {
@@ -120,7 +120,7 @@ func (q *requestQueue) UpdateProgress(ctx context.Context, requestID string, pro
 		return err
 	}
 
-	req := &AsyncRequest{RequestID: requestID, Status: current.Status}
+	req := &AsyncRequest{RequestID: requestID, Status: RequestStatus(current.Status)}
 	req.SetKeys()
 
 	// Update progress fields
@@ -214,7 +214,7 @@ func (q *requestQueue) GetByStatus(ctx context.Context, status store.RequestStat
 	// Query using the status index with v1.0.9 API
 	query := q.db.Model(&AsyncRequest{}).
 		Index("status-index").
-		Where("status", "=", status)
+		Where("status", "=", RequestStatus(status))
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -264,7 +264,7 @@ func (q *requestQueue) Delete(ctx context.Context, requestID string) error {
 	}
 
 	// Create model with keys
-	req := &AsyncRequest{RequestID: requestID, Status: current.Status}
+	req := &AsyncRequest{RequestID: requestID, Status: RequestStatus(current.Status)}
 	req.SetKeys()
 
 	// Delete the request

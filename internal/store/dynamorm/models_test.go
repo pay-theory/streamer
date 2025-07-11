@@ -117,35 +117,35 @@ func TestAsyncRequest_SetKeys(t *testing.T) {
 	tests := []struct {
 		name       string
 		requestID  string
-		status     store.RequestStatus
+		status     dynamorm.RequestStatus
 		expectedPK string
 		expectedSK string
 	}{
 		{
 			name:       "pending request",
 			requestID:  "req123",
-			status:     store.StatusPending,
+			status:     dynamorm.StatusPending,
 			expectedPK: "REQ#req123",
 			expectedSK: "STATUS#PENDING",
 		},
 		{
 			name:       "processing request",
 			requestID:  "req456",
-			status:     store.StatusProcessing,
+			status:     dynamorm.StatusProcessing,
 			expectedPK: "REQ#req456",
 			expectedSK: "STATUS#PROCESSING",
 		},
 		{
 			name:       "completed request",
 			requestID:  "req789",
-			status:     store.StatusCompleted,
+			status:     dynamorm.StatusCompleted,
 			expectedPK: "REQ#req789",
 			expectedSK: "STATUS#COMPLETED",
 		},
 		{
 			name:       "failed request",
 			requestID:  "req000",
-			status:     store.StatusFailed,
+			status:     dynamorm.StatusFailed,
 			expectedPK: "REQ#req000",
 			expectedSK: "STATUS#FAILED",
 		},
@@ -175,7 +175,7 @@ func TestAsyncRequest_ToStoreModel(t *testing.T) {
 		SK:                "STATUS#PROCESSING",
 		RequestID:         "req123",
 		ConnectionID:      "conn123",
-		Status:            store.StatusProcessing,
+		Status:            dynamorm.StatusProcessing,
 		CreatedAt:         now,
 		ProcessingStarted: &processingStarted,
 		ProcessingEnded:   &processingEnded,
@@ -248,7 +248,7 @@ func TestAsyncRequest_FromStoreModel(t *testing.T) {
 	assert.Equal(t, "STATUS#PROCESSING", req.SK)
 	assert.Equal(t, "req123", req.RequestID)
 	assert.Equal(t, "conn123", req.ConnectionID)
-	assert.Equal(t, store.StatusProcessing, req.Status)
+	assert.Equal(t, dynamorm.StatusProcessing, req.Status)
 	assert.Equal(t, now, req.CreatedAt)
 	assert.Equal(t, &processingStarted, req.ProcessingStarted)
 	assert.Nil(t, req.ProcessingEnded)

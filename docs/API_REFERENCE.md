@@ -1,5 +1,9 @@
 # Streamer API Reference
 
+**🔥 Updated for DynamORM Single-Model Architecture**
+
+This API reference reflects Streamer's updated architecture using DynamORM single models for both business logic and database operations.
+
 ## WebSocket Connection
 
 ### Connecting
@@ -17,6 +21,8 @@ const ws = new WebSocket('wss://api.example.com/production?Authorization=eyJhbGc
 **Connection Response:**
 - Success: Connection established, no explicit message
 - Failure: Connection closed with error code
+
+**DynamORM Storage:** Connections are stored using the `dynamorm.Connection` model with composite keys (`PK: CONN#{connectionId}`, `SK: METADATA`).
 
 ### JWT Token Requirements
 
@@ -88,6 +94,8 @@ The system sends different types of messages back to the client:
 }
 ```
 
+**DynamORM Storage:** Async requests are stored using the `dynamorm.AsyncRequest` model with composite keys (`PK: REQ#{requestId}`, `SK: STATUS#{status}`) and proper attribute mapping.
+
 #### 3. Progress Update
 
 ```json
@@ -143,6 +151,106 @@ The system sends different types of messages back to the client:
   }
 }
 ```
+
+## DynamORM Data Architecture
+
+Streamer uses DynamORM's single-model architecture where models serve both business logic and database operations.
+
+### Data Models
+
+#### AsyncRequest Model
+```go
+type AsyncRequest struct {
+    // DynamORM composite keys
+    PK string `dynamorm:"pk"`          // REQ#{requestId}
+    SK string `dynamorm:"sk"`          // STATUS#{status}
+    
+    // Business fields with attribute mapping
+    RequestID    string                 `dynamorm:"attr:request_id" json:"requestId"`
+    ConnectionID string                 `dynamorm:"attr:connection_id" json:"connectionId"`
+    Status       RequestStatus          `dynamorm:"attr:status" json:"status"`
+    Action       string                 `dynamorm:"attr:action" json:"action"`
+    Payload      map[string]interface{} `dynamorm:"attr:payload,omitempty" json:"payload,omitempty"`
+    
+    // DynamORM managed fields
+    CreatedAt time.Time `dynamorm:"created_at" json:"createdAt"`
+    UpdatedAt time.Time `dynamorm:"updated_at" json:"updatedAt"`
+    Version   int       `dynamorm:"version" json:"version"`
+    
+    // TTL for automatic cleanup
+    TTL int64 `dynamorm:"attr:ttl,omitempty" json:"ttl,omitempty"`
+}
+```
+
+#### Connection Model
+```go
+type Connection struct {
+    // DynamORM composite keys
+    PK string `dynamorm:"pk"`          // CONN#{connectionId}
+    SK string `dynamorm:"sk"`          // METADATA
+    
+    // Business fields
+    ConnectionID string               `dynamorm:"attr:connection_id" json:"connectionId"`
+    UserID       string               `dynamorm:"attr:user_id" json:"userId"`
+    TenantID     string               `dynamorm:"attr:tenant_id" json:"tenantId"`
+    Endpoint     string               `dynamorm:"attr:endpoint" json:"endpoint"`
+    
+    // DynamORM managed fields
+    CreatedAt time.Time `dynamorm:"created_at" json:"createdAt"`
+    UpdatedAt time.Time `dynamorm:"updated_at" json:"updatedAt"`
+    Version   int       `dynamorm:"version" json:"version"`
+}
+```
+
+### Request Lifecycle
+
+1. **WebSocket Router**:
+   - Receives request via WebSocket
+   - Creates `AsyncRequest` model with `Status: PENDING`
+   - Uses `db.Save()` to store in DynamoDB
+   - Returns "queued" response to client
+
+2. **DynamoDB Streams**:
+   - Triggers processor Lambda on INSERT/MODIFY
+   - Uses `marshal.SafeMarshaler.UnmarshalItem()` to parse stream records
+   - Processes only `Status: PENDING` requests
+
+3. **Async Processor**:
+   - Updates status to `PROCESSING` using `db.Save()`
+   - Executes handler with progress reporting
+   - Updates status to `COMPLETED` or `FAILED`
+   - All updates use DynamORM's single model
+
+### Stream Parsing (DynamORM Pattern)
+
+```go
+import "github.com/pay-theory/dynamorm/pkg/marshal"
+
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+    image := record.Change.NewImage
+    if image == nil {
+        return nil, nil
+    }
+
+    // ✅ Use DynamORM's SafeMarshaler
+    marshaler := marshal.NewSafeMarshaler()
+    
+    var asyncReq dynamorm.AsyncRequest
+    if err := marshaler.UnmarshalItem(image, &asyncReq); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
+    }
+
+    return &asyncReq, nil
+}
+```
+
+### Key Design Principles
+
+- **Single Model**: Each model serves both business logic and database operations
+- **Composite Keys**: Use `PK`/`SK` pattern for DynamoDB single-table design
+- **Attribute Mapping**: Use `dynamorm:"attr:field_name"` for business fields
+- **Managed Fields**: DynamORM automatically handles `created_at`, `updated_at`, `version`
+- **Type Safety**: Full compile-time type checking with DynamORM operations
 
 ## Built-in Handlers
 

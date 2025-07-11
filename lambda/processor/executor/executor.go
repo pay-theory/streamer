@@ -2,22 +2,24 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/pay-theory/streamer/internal/store"
+	"github.com/pay-theory/dynamorm/pkg/core"
+	"github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/progress"
 	"github.com/pay-theory/streamer/pkg/streamer"
 )
 
-// AsyncExecutor handles async request processing
+// AsyncExecutor handles async request processing using DynamORM models
 type AsyncExecutor struct {
 	connManager      connection.ConnectionManager
-	requestQueue     store.RequestQueue
+	db               core.DB
 	handlers         map[string]streamer.Handler
 	progressHandlers map[string]streamer.HandlerWithProgress
 	mu               sync.RWMutex
@@ -25,10 +27,10 @@ type AsyncExecutor struct {
 }
 
 // New creates a new async executor
-func New(connManager connection.ConnectionManager, requestQueue store.RequestQueue, logger *log.Logger) *AsyncExecutor {
+func New(connManager connection.ConnectionManager, db core.DB, logger *log.Logger) *AsyncExecutor {
 	return &AsyncExecutor{
 		connManager:      connManager,
-		requestQueue:     requestQueue,
+		db:               db,
 		handlers:         make(map[string]streamer.Handler),
 		progressHandlers: make(map[string]streamer.HandlerWithProgress),
 		logger:           logger,
@@ -57,12 +59,41 @@ func (e *AsyncExecutor) RegisterHandler(action string, handler streamer.Handler)
 	return nil
 }
 
-// ProcessRequest processes a single async request
-func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.AsyncRequest) error {
+// convertToStreamerRequest converts DynamORM AsyncRequest to streamer.Request for handler compatibility
+func (e *AsyncExecutor) convertToStreamerRequest(asyncReq *dynamorm.AsyncRequest) (*streamer.Request, error) {
+	// Marshal payload to JSON bytes for streamer.Request
+	var payloadBytes []byte
+	var err error
+	
+	if asyncReq.Payload != nil {
+		payloadBytes, err = json.Marshal(asyncReq.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		}
+	}
+	
+	return &streamer.Request{
+		ID:           asyncReq.RequestID,
+		ConnectionID: asyncReq.ConnectionID,
+		Action:       asyncReq.Action,
+		Payload:      payloadBytes,
+		Metadata:     map[string]string{
+			"user_id":   asyncReq.UserID,
+			"tenant_id": asyncReq.TenantID,
+		},
+		CreatedAt: asyncReq.CreatedAt,
+	}, nil
+}
+
+// ProcessRequest processes a single async request using DynamORM
+func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *dynamorm.AsyncRequest) error {
 	e.logger.Printf("Processing async request: %s, action: %s", asyncReq.RequestID, asyncReq.Action)
 
-	// Update status to PROCESSING
-	if err := e.requestQueue.UpdateStatus(ctx, asyncReq.RequestID, store.StatusProcessing, "Processing started"); err != nil {
+	// Update status to PROCESSING using DynamORM
+	asyncReq.Status = dynamorm.StatusProcessing
+	asyncReq.ProgressMessage = "Processing started"
+	asyncReq.SetKeys()
+	if err := e.db.Model(asyncReq).Update("status", "progress_message"); err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
 	}
 
@@ -79,16 +110,28 @@ func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.Asyn
 	if !exists {
 		errMsg := fmt.Sprintf("unknown action: %s", asyncReq.Action)
 		e.logger.Printf("Error: %s", errMsg)
-		e.requestQueue.FailRequest(ctx, asyncReq.RequestID, errMsg)
+		
+		// Update to failed status using DynamORM
+		asyncReq.Status = dynamorm.StatusFailed
+		asyncReq.Error = errMsg
+		asyncReq.SetKeys()
+		e.db.Model(asyncReq).Update("status", "error")
+		
 		return errors.New(errMsg)
 	}
 
-	// Convert AsyncRequest to streamer.Request
-	request, err := streamer.ConvertAsyncRequestToRequest(asyncReq)
+	// Convert AsyncRequest to streamer.Request for handler compatibility
+	request, err := e.convertToStreamerRequest(asyncReq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to convert request: %v", err)
 		e.logger.Printf("Error: %s", errMsg)
-		e.requestQueue.FailRequest(ctx, asyncReq.RequestID, errMsg)
+		
+		// Update to failed status using DynamORM
+		asyncReq.Status = dynamorm.StatusFailed
+		asyncReq.Error = errMsg
+		asyncReq.SetKeys()
+		e.db.Model(asyncReq).Update("status", "error")
+		
 		return fmt.Errorf(errMsg)
 	}
 
@@ -96,7 +139,11 @@ func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.Asyn
 	if err := handler.Validate(request); err != nil {
 		errMsg := fmt.Sprintf("validation failed: %v", err)
 		e.logger.Printf("Error: %s", errMsg)
-		e.requestQueue.FailRequest(ctx, asyncReq.RequestID, errMsg)
+		// Update to failed status using DynamORM
+		asyncReq.Status = dynamorm.StatusFailed
+		asyncReq.Error = errMsg
+		asyncReq.SetKeys()
+		e.db.Model(asyncReq).Update("status", "error")
 		return fmt.Errorf(errMsg)
 	}
 
@@ -136,8 +183,11 @@ func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.Asyn
 		errMsg := fmt.Sprintf("handler failed: %v", err)
 		e.logger.Printf("Error: %s", errMsg)
 
-		// Update request status
-		e.requestQueue.FailRequest(ctx, asyncReq.RequestID, errMsg)
+		// Update to failed status using DynamORM
+		asyncReq.Status = dynamorm.StatusFailed
+		asyncReq.Error = errMsg
+		asyncReq.SetKeys()
+		e.db.Model(asyncReq).Update("status", "error")
 
 		// Send failure notification
 		reporter.Fail(err)
@@ -164,8 +214,12 @@ func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.Asyn
 	endTime := time.Now()
 	asyncReq.ProcessingEnded = &endTime
 
-	// Mark request as complete
-	if err := e.requestQueue.CompleteRequest(ctx, asyncReq.RequestID, resultMap); err != nil {
+	// Mark request as complete using DynamORM
+	asyncReq.Status = dynamorm.StatusCompleted
+	asyncReq.Result = resultMap
+	asyncReq.Progress = 100
+	asyncReq.SetKeys()
+	if err := e.db.Model(asyncReq).Update("status", "result", "progress"); err != nil {
 		e.logger.Printf("Failed to complete request: %v", err)
 		return fmt.Errorf("failed to complete request: %w", err)
 	}
@@ -186,7 +240,7 @@ func (e *AsyncExecutor) ProcessRequest(ctx context.Context, asyncReq *store.Asyn
 }
 
 // ProcessWithRetry processes a request with retry logic
-func (e *AsyncExecutor) ProcessWithRetry(ctx context.Context, asyncReq *store.AsyncRequest) error {
+func (e *AsyncExecutor) ProcessWithRetry(ctx context.Context, asyncReq *dynamorm.AsyncRequest) error {
 	maxRetries := asyncReq.MaxRetries
 	if maxRetries <= 0 {
 		maxRetries = 3
@@ -200,8 +254,11 @@ func (e *AsyncExecutor) ProcessWithRetry(ctx context.Context, asyncReq *store.As
 			retryMsg := fmt.Sprintf("Retry attempt %d/%d", attempt, maxRetries)
 			e.logger.Printf("%s for request %s", retryMsg, asyncReq.RequestID)
 
-			// Update status with retry info
-			e.requestQueue.UpdateStatus(ctx, asyncReq.RequestID, store.StatusRetrying, retryMsg)
+			// Update status with retry info using DynamORM
+			asyncReq.Status = dynamorm.StatusRetrying
+			asyncReq.ProgressMessage = retryMsg
+			asyncReq.SetKeys()
+			e.db.Model(asyncReq).Update("status", "progress_message")
 
 			// Wait before retry (exponential backoff)
 			backoff := time.Duration(attempt) * time.Second * 2
