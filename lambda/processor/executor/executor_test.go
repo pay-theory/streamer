@@ -10,7 +10,6 @@ import (
 
 	"github.com/pay-theory/dynamorm/pkg/core"
 	dynamocks "github.com/pay-theory/dynamorm/pkg/mocks"
-	"github.com/pay-theory/streamer/internal/store"
 	storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
 	"github.com/pay-theory/streamer/pkg/connection"
 	"github.com/pay-theory/streamer/pkg/streamer"
@@ -32,73 +31,6 @@ func createTestExecutor(mockDB core.DB, logger *log.Logger) *AsyncExecutor {
 		progressHandlers: make(map[string]streamer.HandlerWithProgress),
 		logger:           logger,
 	}
-}
-
-// Mock request queue
-type mockRequestQueue struct {
-	mock.Mock
-}
-
-func (m *mockRequestQueue) Enqueue(ctx context.Context, req *store.AsyncRequest) error {
-	args := m.Called(ctx, req)
-	return args.Error(0)
-}
-
-func (m *mockRequestQueue) Dequeue(ctx context.Context, limit int) ([]*store.AsyncRequest, error) {
-	args := m.Called(ctx, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*store.AsyncRequest), args.Error(1)
-}
-
-func (m *mockRequestQueue) Get(ctx context.Context, requestID string) (*store.AsyncRequest, error) {
-	args := m.Called(ctx, requestID)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*store.AsyncRequest), args.Error(1)
-}
-
-func (m *mockRequestQueue) UpdateStatus(ctx context.Context, requestID string, status store.RequestStatus, message string) error {
-	args := m.Called(ctx, requestID, status, message)
-	return args.Error(0)
-}
-
-func (m *mockRequestQueue) UpdateProgress(ctx context.Context, requestID string, progress float64, message string, details map[string]interface{}) error {
-	args := m.Called(ctx, requestID, progress, message, details)
-	return args.Error(0)
-}
-
-func (m *mockRequestQueue) CompleteRequest(ctx context.Context, requestID string, result map[string]interface{}) error {
-	args := m.Called(ctx, requestID, result)
-	return args.Error(0)
-}
-
-func (m *mockRequestQueue) FailRequest(ctx context.Context, requestID string, errMsg string) error {
-	args := m.Called(ctx, requestID, errMsg)
-	return args.Error(0)
-}
-
-func (m *mockRequestQueue) GetByConnection(ctx context.Context, connectionID string, limit int) ([]*store.AsyncRequest, error) {
-	args := m.Called(ctx, connectionID, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*store.AsyncRequest), args.Error(1)
-}
-
-func (m *mockRequestQueue) GetByStatus(ctx context.Context, status store.RequestStatus, limit int) ([]*store.AsyncRequest, error) {
-	args := m.Called(ctx, status, limit)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*store.AsyncRequest), args.Error(1)
-}
-
-func (m *mockRequestQueue) Delete(ctx context.Context, requestID string) error {
-	args := m.Called(ctx, requestID)
-	return args.Error(0)
 }
 
 // Mock handler
@@ -138,15 +70,15 @@ func (m *mockHandlerWithProgress) ProcessWithProgress(ctx context.Context, req *
 }
 
 func TestNew(t *testing.T) {
-	mockQueue := new(mockRequestQueue)
+	mockDB := new(dynamocks.MockDB)
 	logger := log.New(os.Stdout, "[TEST] ", log.LstdFlags)
 
 	// Using connection mock
 	mockConnMgr := connection.NewMockConnectionManager()
-	executor := New(mockConnMgr, mockQueue, logger)
+	executor := New(mockConnMgr, mockDB, logger)
 
 	assert.NotNil(t, executor)
-	assert.Equal(t, mockQueue, executor.requestQueue)
+	assert.Equal(t, mockDB, executor.db)
 	assert.NotNil(t, executor.handlers)
 	assert.NotNil(t, executor.progressHandlers)
 	assert.Equal(t, logger, executor.logger)
@@ -209,28 +141,31 @@ func TestProcessRequest(t *testing.T) {
 
 	t.Run("successful processing without progress", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-123",
 			ConnectionID: "conn-456",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			Payload:      map[string]interface{}{"data": "test"},
 			CreatedAt:    time.Now(),
 		}
 
-		// Mock expectations
-		mockQueue.On("UpdateStatus", mock.Anything, "req-123", store.StatusProcessing, "Processing started").Return(nil)
+		// Mock expectations for status updates
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "result", "progress"}).Return(nil).Once()
 
 		mockHandler.On("Validate", mock.MatchedBy(func(req *streamer.Request) bool {
 			return req.ID == "req-123" && req.Action == "test-action"
@@ -243,10 +178,6 @@ func TestProcessRequest(t *testing.T) {
 		}
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(result, nil)
 
-		mockQueue.On("CompleteRequest", mock.Anything, "req-123", mock.MatchedBy(func(resultMap map[string]interface{}) bool {
-			return resultMap["success"] == true
-		})).Return(nil)
-
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
 			return nil
@@ -255,34 +186,38 @@ func TestProcessRequest(t *testing.T) {
 		err := executor.ProcessRequest(context.Background(), asyncReq)
 		assert.NoError(t, err)
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("successful processing with progress", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandlerWithProgress)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"progress-action": mockHandler},
 			progressHandlers: map[string]streamer.HandlerWithProgress{"progress-action": mockHandler},
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-789",
 			ConnectionID: "conn-012",
 			Action:       "progress-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			Payload:      map[string]interface{}{"data": "test"},
 			CreatedAt:    time.Now(),
 		}
 
-		// Mock expectations
-		mockQueue.On("UpdateStatus", mock.Anything, "req-789", store.StatusProcessing, "Processing started").Return(nil)
+		// Mock expectations for status updates
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "result", "progress"}).Return(nil).Once()
 
 		mockHandler.On("Validate", mock.Anything).Return(nil)
 
@@ -293,8 +228,6 @@ func TestProcessRequest(t *testing.T) {
 		}
 		mockHandler.On("ProcessWithProgress", mock.Anything, mock.Anything, mock.Anything).Return(result, nil)
 
-		mockQueue.On("CompleteRequest", mock.Anything, "req-789", mock.Anything).Return(nil)
-
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
 			return nil
@@ -303,99 +236,111 @@ func TestProcessRequest(t *testing.T) {
 		err := executor.ProcessRequest(context.Background(), asyncReq)
 		assert.NoError(t, err)
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("unknown action error", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         make(map[string]streamer.Handler),
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-unknown",
 			ConnectionID: "conn-unknown",
 			Action:       "unknown-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			CreatedAt:    time.Now(),
 		}
 
-		mockQueue.On("UpdateStatus", mock.Anything, "req-unknown", store.StatusProcessing, "Processing started").Return(nil)
-		mockQueue.On("FailRequest", mock.Anything, "req-unknown", "unknown action: unknown-action").Return(nil)
+		// Mock expectations
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		err := executor.ProcessRequest(context.Background(), asyncReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown action")
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 	})
 
 	t.Run("validation error", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-invalid",
 			ConnectionID: "conn-invalid",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			CreatedAt:    time.Now(),
 		}
 
-		mockQueue.On("UpdateStatus", mock.Anything, "req-invalid", store.StatusProcessing, "Processing started").Return(nil)
+		// Mock expectations
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
 		mockHandler.On("Validate", mock.Anything).Return(errors.New("validation failed"))
-		mockQueue.On("FailRequest", mock.Anything, "req-invalid", "validation failed: validation failed").Return(nil)
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		err := executor.ProcessRequest(context.Background(), asyncReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "validation failed")
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("handler processing error", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-error",
 			ConnectionID: "conn-error",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			Payload:      map[string]interface{}{"data": "test"},
 			CreatedAt:    time.Now(),
 		}
 
-		mockQueue.On("UpdateStatus", mock.Anything, "req-error", store.StatusProcessing, "Processing started").Return(nil)
+		// Mock expectations
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
 		mockHandler.On("Validate", mock.Anything).Return(nil)
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(nil, errors.New("processing failed"))
-		mockQueue.On("FailRequest", mock.Anything, "req-error", "handler failed: processing failed").Return(nil)
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
@@ -406,7 +351,8 @@ func TestProcessRequest(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "handler failed")
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 }
@@ -416,32 +362,34 @@ func TestProcessWithRetry(t *testing.T) {
 
 	t.Run("successful on first attempt", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-retry-1",
 			ConnectionID: "conn-retry-1",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			Payload:      map[string]interface{}{"data": "test"},
 			MaxRetries:   3,
 			CreatedAt:    time.Now(),
 		}
 
 		// Mock expectations for successful processing
-		mockQueue.On("UpdateStatus", mock.Anything, "req-retry-1", store.StatusProcessing, "Processing started").Return(nil)
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
 		mockHandler.On("Validate", mock.Anything).Return(nil)
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(&streamer.Result{Success: true}, nil)
-		mockQueue.On("CompleteRequest", mock.Anything, "req-retry-1", mock.Anything).Return(nil)
+		mockQuery.On("Update", []string{"status", "result", "progress"}).Return(nil).Once()
 
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
@@ -451,44 +399,48 @@ func TestProcessWithRetry(t *testing.T) {
 		err := executor.ProcessWithRetry(context.Background(), asyncReq)
 		assert.NoError(t, err)
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("retryable error then success", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-retry-2",
 			ConnectionID: "conn-retry-2",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			Payload:      map[string]interface{}{"data": "test"},
 			MaxRetries:   3,
 			CreatedAt:    time.Now(),
 		}
 
+		// Mock expectations
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		
 		// First attempt fails with timeout
-		mockQueue.On("UpdateStatus", mock.Anything, "req-retry-2", store.StatusProcessing, "Processing started").Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
 		mockHandler.On("Validate", mock.Anything).Return(nil)
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(nil, errors.New("timeout")).Once()
-		mockQueue.On("FailRequest", mock.Anything, "req-retry-2", mock.Anything).Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		// Retry attempt
-		mockQueue.On("UpdateStatus", mock.Anything, "req-retry-2", store.StatusRetrying, "Retry attempt 1/3").Return(nil).Once()
-		mockQueue.On("UpdateStatus", mock.Anything, "req-retry-2", store.StatusProcessing, "Processing started").Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Twice() // Once for retry status, once for processing
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(&streamer.Result{Success: true}, nil).Once()
-		mockQueue.On("CompleteRequest", mock.Anything, "req-retry-2", mock.Anything).Return(nil)
+		mockQuery.On("Update", []string{"status", "result", "progress"}).Return(nil).Once()
 
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
@@ -499,59 +451,64 @@ func TestProcessWithRetry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, asyncReq.RetryCount)
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("non-retryable error", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:    "req-retry-3",
 			ConnectionID: "conn-retry-3",
 			Action:       "test-action",
-			Status:       store.StatusPending,
+			Status:       storedynamorm.StatusPending,
 			MaxRetries:   3,
 			CreatedAt:    time.Now(),
 		}
 
 		// Validation error is not retryable
-		mockQueue.On("UpdateStatus", mock.Anything, "req-retry-3", store.StatusProcessing, "Processing started").Return(nil)
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Once()
 		mockHandler.On("Validate", mock.Anything).Return(errors.New("validation error"))
-		mockQueue.On("FailRequest", mock.Anything, "req-retry-3", mock.Anything).Return(nil)
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		err := executor.ProcessWithRetry(context.Background(), asyncReq)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed after 1 attempts")
 
-		mockQueue.AssertExpectations(t)
+		mockDB.AssertExpectations(t)
+		mockQuery.AssertExpectations(t)
 		mockHandler.AssertExpectations(t)
 	})
 
 	t.Run("context cancellation during retry", func(t *testing.T) {
 		mockConnMgr := connection.NewMockConnectionManager()
-		mockQueue := new(mockRequestQueue)
+		mockDB := new(dynamocks.MockDB)
+		mockQuery := new(dynamocks.MockQuery)
 		mockHandler := new(mockHandler)
 
 		executor := &AsyncExecutor{
 			connManager:      mockConnMgr,
-			requestQueue:     mockQueue,
+			db:               mockDB,
 			handlers:         map[string]streamer.Handler{"test-action": mockHandler},
 			progressHandlers: make(map[string]streamer.HandlerWithProgress),
 			logger:           logger,
 		}
 
-		asyncReq := &store.AsyncRequest{
+		asyncReq := &storedynamorm.AsyncRequest{
 			RequestID:  "req-cancel",
 			Action:     "test-action",
 			MaxRetries: 3,
@@ -561,11 +518,11 @@ func TestProcessWithRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// First attempt fails
-		mockQueue.On("UpdateStatus", mock.Anything, "req-cancel", store.StatusProcessing, "Processing started").Return(nil).Once()
+		mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+		mockQuery.On("Update", []string{"status", "progress_message"}).Return(nil).Twice() // Once for processing, once for retry
 		mockHandler.On("Validate", mock.Anything).Return(nil)
 		mockHandler.On("Process", mock.Anything, mock.Anything).Return(nil, errors.New("timeout")).Once()
-		mockQueue.On("FailRequest", mock.Anything, "req-cancel", mock.Anything).Return(nil).Once()
-		mockQueue.On("UpdateStatus", mock.Anything, "req-cancel", store.StatusRetrying, "Retry attempt 1/3").Return(nil).Once()
+		mockQuery.On("Update", []string{"status", "error"}).Return(nil).Once()
 
 		// Set up connection manager mock behavior
 		mockConnMgr.SendFunc = func(ctx context.Context, connectionID string, message interface{}) error {
