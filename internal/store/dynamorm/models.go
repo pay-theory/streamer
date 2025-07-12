@@ -10,8 +10,8 @@ import (
 // Connection represents a WebSocket connection - single model serving both business and database needs
 type Connection struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk,hash"`
-	SK string `dynamorm:"sk,range"`
+	PK string `dynamorm:"pk"`
+	SK string `dynamorm:"sk"`
 
 	// Connection data with proper attribute mapping
 	ConnectionID string    `dynamorm:"connection_id" json:"connectionId"`
@@ -59,8 +59,8 @@ const (
 // AsyncRequest represents a queued async request - single model serving both business and database needs
 type AsyncRequest struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk,hash"`
-	SK string `dynamorm:"sk,range"`
+	PK string `dynamorm:"pk"`
+	SK string `dynamorm:"sk"`
 
 	// Request data with proper attribute mapping
 	RequestID    string                 `dynamorm:"request_id" json:"requestId"`
@@ -114,8 +114,8 @@ func (r *AsyncRequest) SetKeys() {
 // Subscription represents a real-time update subscription - single model serving both business and database needs
 type Subscription struct {
 	// DynamORM composite key pattern
-	PK string `dynamorm:"pk,hash"`
-	SK string `dynamorm:"sk,range"`
+	PK string `dynamorm:"pk"`
+	SK string `dynamorm:"sk"`
 
 	// Subscription data with proper attribute mapping
 	SubscriptionID string   `dynamorm:"subscription_id" json:"subscriptionId"`
