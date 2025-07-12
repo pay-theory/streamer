@@ -33,7 +33,7 @@ type Connection struct {
     // ...
 }
 
-// After: internal/store/dynamorm/models.go
+// After: pkg/models/models.go
 type Connection struct {
     PK string `dynamorm:"pk"`
     SK string `dynamorm:"sk"`

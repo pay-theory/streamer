@@ -13,6 +13,7 @@ import (
 
 	"github.com/pay-theory/streamer/internal/store"
 	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	"github.com/pay-theory/streamer/pkg/models"
 )
 
 // Test using DynamORM mocks for detailed behavior verification
@@ -35,7 +36,7 @@ func TestRequestQueue_Enqueue_WithDynamORMMocks(t *testing.T) {
 				Payload:      map[string]interface{}{"data": "test"},
 			},
 			setupMock: func(db *dynamocks.MockDB, q *dynamocks.MockQuery) {
-				db.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(q)
+				db.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(q)
 				q.On("Create").Return(nil)
 			},
 			expectError: false,
@@ -50,7 +51,7 @@ func TestRequestQueue_Enqueue_WithDynamORMMocks(t *testing.T) {
 				Action:       "test-action",
 			},
 			setupMock: func(db *dynamocks.MockDB, q *dynamocks.MockQuery) {
-				db.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(q)
+				db.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(q)
 				q.On("Create").Return(errors.New("DynamoDB service unavailable"))
 			},
 			expectError: true,
@@ -119,16 +120,16 @@ func TestRequestQueue_Get_WithDynamORMMocks(t *testing.T) {
 			name:      "successful get",
 			requestID: "req-123",
 			setupMock: func(db *dynamocks.MockDB, q *dynamocks.MockQuery) {
-				db.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(q)
+				db.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(q)
 				q.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(q)
-				q.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-					dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-					*dest = []dynamorm.AsyncRequest{
+				q.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+					dest := args.Get(0).(*[]models.AsyncRequest)
+					*dest = []models.AsyncRequest{
 						{
 							RequestID:    "req-123",
 							ConnectionID: "conn-456",
 							Action:       "test-action",
-							Status:       dynamorm.StatusPending,
+							Status:       models.StatusPending,
 						},
 					}
 				}).Return(nil)
@@ -152,11 +153,11 @@ func TestRequestQueue_Get_WithDynamORMMocks(t *testing.T) {
 			name:      "request not found",
 			requestID: "req-nonexistent",
 			setupMock: func(db *dynamocks.MockDB, q *dynamocks.MockQuery) {
-				db.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(q)
+				db.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(q)
 				q.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(q)
-				q.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-					dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-					*dest = []dynamorm.AsyncRequest{} // Empty slice
+				q.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+					dest := args.Get(0).(*[]models.AsyncRequest)
+					*dest = []models.AsyncRequest{} // Empty slice
 				}).Return(nil)
 			},
 			expectError: true,
@@ -210,16 +211,16 @@ func TestRequestQueue_UpdateStatus_WithDynamORMMocks(t *testing.T) {
 			message:   "Processing started",
 			setupMock: func(db *dynamocks.MockDB, q *dynamocks.MockQuery) {
 				// Mock Get call
-				db.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(q)
+				db.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(q)
 				q.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(q)
-				q.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-					dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-					*dest = []dynamorm.AsyncRequest{
+				q.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+					dest := args.Get(0).(*[]models.AsyncRequest)
+					*dest = []models.AsyncRequest{
 						{
 							RequestID:    "req-123",
 							ConnectionID: "conn-456",
 							Action:       "test-action",
-							Status:       dynamorm.StatusPending,
+							Status:       models.StatusPending,
 						},
 					}
 				}).Return(nil)
@@ -273,24 +274,24 @@ func TestRequestQueue_GetByConnection_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for successful query
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Index", "connection-index").Return(mockQuery)
 	mockQuery.On("Where", "connection_id", "=", "conn-456").Return(mockQuery)
 	mockQuery.On("Limit", 10).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       dynamorm.StatusPending,
+				Status:       models.StatusPending,
 			},
 			{
 				RequestID:    "req-2",
 				ConnectionID: "conn-456",
 				Action:       "action-2",
-				Status:       dynamorm.StatusProcessing,
+				Status:       models.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -312,18 +313,18 @@ func TestRequestQueue_GetByStatus_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for successful query
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Index", "status-index").Return(mockQuery)
-	mockQuery.On("Where", "status", "=", dynamorm.StatusPending).Return(mockQuery)
+	mockQuery.On("Where", "status", "=", models.StatusPending).Return(mockQuery)
 	mockQuery.On("Limit", 5).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       dynamorm.StatusPending,
+				Status:       models.StatusPending,
 			},
 		}
 	}).Return(nil)
@@ -345,16 +346,16 @@ func TestRequestQueue_Delete_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for Get call
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       dynamorm.StatusCompleted,
+				Status:       models.StatusCompleted,
 			},
 		}
 	}).Return(nil)
@@ -376,16 +377,16 @@ func TestRequestQueue_UpdateProgress_WithDynamORMMocks(t *testing.T) {
 	mockUpdateBuilder := new(dynamocks.MockUpdateBuilder)
 
 	// Setup mock for Get call
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       dynamorm.StatusProcessing,
+				Status:       models.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -411,16 +412,16 @@ func TestRequestQueue_CompleteRequest_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for Get call
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       dynamorm.StatusProcessing,
+				Status:       models.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -443,16 +444,16 @@ func TestRequestQueue_FailRequest_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for Get call
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Where", "pk", "=", mock.AnythingOfType("string")).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-123",
 				ConnectionID: "conn-456",
 				Action:       "test-action",
-				Status:       dynamorm.StatusProcessing,
+				Status:       models.StatusProcessing,
 			},
 		}
 	}).Return(nil)
@@ -474,24 +475,24 @@ func TestRequestQueue_Dequeue_WithDynamORMMocks(t *testing.T) {
 	mockQuery := new(dynamocks.MockQuery)
 
 	// Setup mock for GetByStatus call
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQuery)
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQuery)
 	mockQuery.On("Index", "status-index").Return(mockQuery)
-	mockQuery.On("Where", "status", "=", dynamorm.StatusPending).Return(mockQuery)
+	mockQuery.On("Where", "status", "=", models.StatusPending).Return(mockQuery)
 	mockQuery.On("Limit", 5).Return(mockQuery)
-	mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.AsyncRequest")).Run(func(args mock.Arguments) {
-		dest := args.Get(0).(*[]dynamorm.AsyncRequest)
-		*dest = []dynamorm.AsyncRequest{
+	mockQuery.On("All", mock.AnythingOfType("*[]models.AsyncRequest")).Run(func(args mock.Arguments) {
+		dest := args.Get(0).(*[]models.AsyncRequest)
+		*dest = []models.AsyncRequest{
 			{
 				RequestID:    "req-1",
 				ConnectionID: "conn-456",
 				Action:       "action-1",
-				Status:       dynamorm.StatusPending,
+				Status:       models.StatusPending,
 			},
 			{
 				RequestID:    "req-2",
 				ConnectionID: "conn-789",
 				Action:       "action-2",
-				Status:       dynamorm.StatusPending,
+				Status:       models.StatusPending,
 			},
 		}
 	}).Return(nil)

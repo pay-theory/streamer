@@ -52,7 +52,7 @@ func TestStorageIntegration(t *testing.T) {
 	}
 
 	// Set up mock expectations for saving connection
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQueryForConnection).Once()
+	mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQueryForConnection).Once()
 	mockQueryForConnection.On("Create").Return(nil).Once()
 
 	// Save connection
@@ -76,7 +76,7 @@ func TestStorageIntegration(t *testing.T) {
 	}
 
 	// Set up mock expectations for queuing request
-	mockDB.On("Model", mock.AnythingOfType("*dynamorm.AsyncRequest")).Return(mockQueryForRequest).Once()
+	mockDB.On("Model", mock.AnythingOfType("*models.AsyncRequest")).Return(mockQueryForRequest).Once()
 	mockQueryForRequest.On("Create").Return(nil).Once()
 
 	// Queue the request

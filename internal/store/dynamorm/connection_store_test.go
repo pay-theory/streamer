@@ -9,6 +9,7 @@ import (
 	"github.com/pay-theory/dynamorm/pkg/mocks"
 	"github.com/pay-theory/streamer/internal/store"
 	"github.com/pay-theory/streamer/internal/store/dynamorm"
+	"github.com/pay-theory/streamer/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -45,7 +46,7 @@ func TestConnectionStore_Save(t *testing.T) {
 				Metadata:     map[string]string{"client": "web"},
 			},
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Create").Return(nil)
 			},
 			wantErr: false,
@@ -62,7 +63,7 @@ func TestConnectionStore_Save(t *testing.T) {
 				TTL:          0, // Should be auto-set
 			},
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Create").Return(nil)
 			},
 			wantErr: false,
@@ -137,7 +138,7 @@ func TestConnectionStore_Save(t *testing.T) {
 				Endpoint:     "wss://example.com/ws",
 			},
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Create").Return(errors.New("dynamodb error"))
 			},
 			wantErr: true,
@@ -192,7 +193,7 @@ func TestConnectionStore_Get(t *testing.T) {
 			name:         "successful get",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				expectedConn := &dynamorm.Connection{
+				expectedConn := &models.Connection{
 					ConnectionID: "conn123",
 					UserID:       "user123",
 					TenantID:     "tenant123",
@@ -202,12 +203,12 @@ func TestConnectionStore_Get(t *testing.T) {
 				}
 				expectedConn.SetKeys()
 
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Where", "pk", "=", expectedConn.PK).Return(mockQuery)
 				mockQuery.On("Where", "sk", "=", expectedConn.SK).Return(mockQuery)
-				mockQuery.On("First", mock.AnythingOfType("*dynamorm.Connection")).
+				mockQuery.On("First", mock.AnythingOfType("*models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*dynamorm.Connection)
+						dest := args.Get(0).(*models.Connection)
 						*dest = *expectedConn
 					}).Return(nil)
 			},
@@ -232,13 +233,13 @@ func TestConnectionStore_Get(t *testing.T) {
 			name:         "not found",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				conn := &dynamorm.Connection{ConnectionID: "conn123"}
+				conn := &models.Connection{ConnectionID: "conn123"}
 				conn.SetKeys()
 
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Where", "pk", "=", conn.PK).Return(mockQuery)
 				mockQuery.On("Where", "sk", "=", conn.SK).Return(mockQuery)
-				mockQuery.On("First", mock.AnythingOfType("*dynamorm.Connection")).Return(errors.New("item not found"))
+				mockQuery.On("First", mock.AnythingOfType("*models.Connection")).Return(errors.New("item not found"))
 			},
 			wantErr: true,
 			errMsg:  "item not found",
@@ -247,13 +248,13 @@ func TestConnectionStore_Get(t *testing.T) {
 			name:         "dynamodb error",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				conn := &dynamorm.Connection{ConnectionID: "conn123"}
+				conn := &models.Connection{ConnectionID: "conn123"}
 				conn.SetKeys()
 
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Where", "pk", "=", conn.PK).Return(mockQuery)
 				mockQuery.On("Where", "sk", "=", conn.SK).Return(mockQuery)
-				mockQuery.On("First", mock.AnythingOfType("*dynamorm.Connection")).Return(errors.New("dynamodb error"))
+				mockQuery.On("First", mock.AnythingOfType("*models.Connection")).Return(errors.New("dynamodb error"))
 			},
 			wantErr: true,
 			errMsg:  "failed to get connection",
@@ -306,7 +307,7 @@ func TestConnectionStore_Delete(t *testing.T) {
 			name:         "successful delete",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Delete").Return(nil)
 			},
 			wantErr: false,
@@ -324,7 +325,7 @@ func TestConnectionStore_Delete(t *testing.T) {
 			name:         "dynamodb error",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("Delete").Return(errors.New("dynamodb error"))
 			},
 			wantErr: true,
@@ -375,7 +376,7 @@ func TestConnectionStore_ListByUser(t *testing.T) {
 			name:   "successful list",
 			userID: "user123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				expectedConnections := []dynamorm.Connection{
+				expectedConnections := []models.Connection{
 					{
 						ConnectionID: "conn1",
 						UserID:       "user123",
@@ -388,12 +389,12 @@ func TestConnectionStore_ListByUser(t *testing.T) {
 					},
 				}
 
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Index", "user-index").Return(mockQuery)
 				mockQuery.On("Where", "user_id", "=", "user123").Return(mockQuery)
-				mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.Connection")).
+				mockQuery.On("All", mock.AnythingOfType("*[]models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*[]dynamorm.Connection)
+						dest := args.Get(0).(*[]models.Connection)
 						*dest = expectedConnections
 					}).Return(nil)
 			},
@@ -413,10 +414,10 @@ func TestConnectionStore_ListByUser(t *testing.T) {
 			name:   "dynamodb error",
 			userID: "user123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Index", "user-index").Return(mockQuery)
 				mockQuery.On("Where", "user_id", "=", "user123").Return(mockQuery)
-				mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.Connection")).Return(errors.New("dynamodb error"))
+				mockQuery.On("All", mock.AnythingOfType("*[]models.Connection")).Return(errors.New("dynamodb error"))
 			},
 			wantErr: true,
 			errMsg:  "failed to list connections by user",
@@ -425,13 +426,13 @@ func TestConnectionStore_ListByUser(t *testing.T) {
 			name:   "no connections found",
 			userID: "user123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Index", "user-index").Return(mockQuery)
 				mockQuery.On("Where", "user_id", "=", "user123").Return(mockQuery)
-				mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.Connection")).
+				mockQuery.On("All", mock.AnythingOfType("*[]models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*[]dynamorm.Connection)
-						*dest = []dynamorm.Connection{}
+						dest := args.Get(0).(*[]models.Connection)
+						*dest = []models.Connection{}
 					}).Return(nil)
 			},
 			want:    0,
@@ -483,7 +484,7 @@ func TestConnectionStore_ListByTenant(t *testing.T) {
 			name:     "successful list",
 			tenantID: "tenant123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				expectedConnections := []dynamorm.Connection{
+				expectedConnections := []models.Connection{
 					{
 						ConnectionID: "conn1",
 						UserID:       "user1",
@@ -496,12 +497,12 @@ func TestConnectionStore_ListByTenant(t *testing.T) {
 					},
 				}
 
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Index", "tenant-index").Return(mockQuery)
 				mockQuery.On("Where", "tenant_id", "=", "tenant123").Return(mockQuery)
-				mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.Connection")).
+				mockQuery.On("All", mock.AnythingOfType("*[]models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*[]dynamorm.Connection)
+						dest := args.Get(0).(*[]models.Connection)
 						*dest = expectedConnections
 					}).Return(nil)
 			},
@@ -521,10 +522,10 @@ func TestConnectionStore_ListByTenant(t *testing.T) {
 			name:     "dynamodb error",
 			tenantID: "tenant123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Index", "tenant-index").Return(mockQuery)
 				mockQuery.On("Where", "tenant_id", "=", "tenant123").Return(mockQuery)
-				mockQuery.On("All", mock.AnythingOfType("*[]dynamorm.Connection")).Return(errors.New("dynamodb error"))
+				mockQuery.On("All", mock.AnythingOfType("*[]models.Connection")).Return(errors.New("dynamodb error"))
 			},
 			wantErr: true,
 			errMsg:  "failed to list connections by tenant",
@@ -574,7 +575,7 @@ func TestConnectionStore_UpdateLastPing(t *testing.T) {
 			name:         "successful update",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery, mockUpdateBuilder *mocks.MockUpdateBuilder) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("UpdateBuilder").Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "last_ping", mock.AnythingOfType("time.Time")).Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "ttl", mock.AnythingOfType("int64")).Return(mockUpdateBuilder)
@@ -595,7 +596,7 @@ func TestConnectionStore_UpdateLastPing(t *testing.T) {
 			name:         "not found",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery, mockUpdateBuilder *mocks.MockUpdateBuilder) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("UpdateBuilder").Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "last_ping", mock.AnythingOfType("time.Time")).Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "ttl", mock.AnythingOfType("int64")).Return(mockUpdateBuilder)
@@ -608,7 +609,7 @@ func TestConnectionStore_UpdateLastPing(t *testing.T) {
 			name:         "dynamodb error",
 			connectionID: "conn123",
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery, mockUpdateBuilder *mocks.MockUpdateBuilder) {
-				mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(mockQuery)
+				mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(mockQuery)
 				mockQuery.On("UpdateBuilder").Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "last_ping", mock.AnythingOfType("time.Time")).Return(mockUpdateBuilder)
 				mockUpdateBuilder.On("Set", "ttl", mock.AnythingOfType("int64")).Return(mockUpdateBuilder)
@@ -665,24 +666,24 @@ func TestConnectionStore_DeleteStale(t *testing.T) {
 			name:   "successful delete stale",
 			before: staleTime,
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				staleConnections := []dynamorm.Connection{
+				staleConnections := []models.Connection{
 					{ConnectionID: "conn1", LastPing: staleTime.Add(-30 * time.Minute)},
 					{ConnectionID: "conn2", LastPing: staleTime.Add(-2 * time.Hour)},
 				}
 
 				// Mock the scan
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Where", "last_ping", "<", staleTime).Return(mockQuery)
-				mockQuery.On("Scan", mock.AnythingOfType("*[]dynamorm.Connection")).
+				mockQuery.On("Scan", mock.AnythingOfType("*[]models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*[]dynamorm.Connection)
+						dest := args.Get(0).(*[]models.Connection)
 						*dest = staleConnections
 					}).Return(nil)
 
 				// Mock the deletes
 				for range staleConnections {
 					deleteQuery := new(mocks.MockQuery)
-					mockDB.On("Model", mock.AnythingOfType("*dynamorm.Connection")).Return(deleteQuery).Once()
+					mockDB.On("Model", mock.AnythingOfType("*models.Connection")).Return(deleteQuery).Once()
 					deleteQuery.On("Delete").Return(nil)
 				}
 			},
@@ -692,9 +693,9 @@ func TestConnectionStore_DeleteStale(t *testing.T) {
 			name:   "scan error",
 			before: staleTime,
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Where", "last_ping", "<", staleTime).Return(mockQuery)
-				mockQuery.On("Scan", mock.AnythingOfType("*[]dynamorm.Connection")).Return(errors.New("scan error"))
+				mockQuery.On("Scan", mock.AnythingOfType("*[]models.Connection")).Return(errors.New("scan error"))
 			},
 			wantErr: true,
 			errMsg:  "failed to scan stale connections",
@@ -703,12 +704,12 @@ func TestConnectionStore_DeleteStale(t *testing.T) {
 			name:   "no stale connections",
 			before: staleTime,
 			setupMock: func(mockDB *mocks.MockDB, mockQuery *mocks.MockQuery) {
-				mockDB.On("Model", &dynamorm.Connection{}).Return(mockQuery)
+				mockDB.On("Model", &models.Connection{}).Return(mockQuery)
 				mockQuery.On("Where", "last_ping", "<", staleTime).Return(mockQuery)
-				mockQuery.On("Scan", mock.AnythingOfType("*[]dynamorm.Connection")).
+				mockQuery.On("Scan", mock.AnythingOfType("*[]models.Connection")).
 					Run(func(args mock.Arguments) {
-						dest := args.Get(0).(*[]dynamorm.Connection)
-						*dest = []dynamorm.Connection{}
+						dest := args.Get(0).(*[]models.Connection)
+						*dest = []models.Connection{}
 					}).Return(nil)
 			},
 			wantErr: false,

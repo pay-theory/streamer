@@ -7,7 +7,7 @@ Streamer provides WebSocket-based async request processing with real-time progre
 ## Key Architecture Points
 
 ### 1. DynamORM Integration
-- **Single Model Architecture**: Models in `internal/store/dynamorm` serve both business logic and database operations
+- **Single Model Architecture**: Models in `pkg/models` serve both business logic and database operations
 - **No AWS SDK**: Never use AWS SDK's `attributevalue` package - DynamORM provides all marshaling
 - **Stream Processing**: Use `dynamorm.UnmarshalStreamImage()` for DynamoDB streams
 
@@ -22,7 +22,9 @@ streamer/
 │   └── disconnect/      # WebSocket disconnection handler
 ├── internal/
 │   └── store/
-│       └── dynamorm/    # DynamORM models (Connection, AsyncRequest, Subscription)
+│       └── dynamorm/    # Internal DynamORM implementation
+└── pkg/
+    └── models/         # Public models (Connection, AsyncRequest, Subscription)
 └── pkg/
     ├── streamer/        # Core interfaces and router
     └── connection/      # WebSocket connection management
@@ -147,14 +149,14 @@ func (h *MyHandler) ProcessWithProgress(ctx context.Context, payload map[string]
 In your processor Lambda, use DynamORM's native stream support:
 
 ```go
-func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*models.AsyncRequest, error) {
     image := record.Change.NewImage
     if image == nil {
         return nil, nil
     }
 
     // Use DynamORM's native stream support (v1.0.24+)
-    var asyncReq dynamorm.AsyncRequest
+    var asyncReq models.AsyncRequest
     if err := dynamorm.UnmarshalStreamImage(image, &asyncReq); err != nil {
         return nil, fmt.Errorf("failed to unmarshal AsyncRequest: %w", err)
     }
@@ -222,7 +224,7 @@ See `tests/integration/` for examples of testing with real DynamoDB tables.
    ```go
    import (
        "github.com/pay-theory/dynamorm"
-       storedynamorm "github.com/pay-theory/streamer/internal/store/dynamorm"
+       "github.com/pay-theory/streamer/pkg/models"
    )
    ```
 

@@ -167,6 +167,7 @@ Use the DynamORM factory pattern to get the database instance:
 import (
     "github.com/pay-theory/dynamorm/pkg/session"
     "github.com/pay-theory/streamer/internal/store/dynamorm"
+    "github.com/pay-theory/streamer/pkg/models"
 )
 
 // Create DynamORM configuration
@@ -218,10 +219,10 @@ err := exec.ProcessWithRetry(ctx, asyncRequest)
 import (
     "github.com/aws/aws-lambda-go/events"
     "github.com/pay-theory/dynamorm/pkg/marshal"
-    "github.com/pay-theory/streamer/internal/store/dynamorm"
+    "github.com/pay-theory/streamer/pkg/models"
 )
 
-func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncRequest, error) {
+func parseAsyncRequest(record events.DynamoDBEventRecord) (*models.AsyncRequest, error) {
     image := record.Change.NewImage
     if image == nil {
         return nil, nil
@@ -230,7 +231,7 @@ func parseAsyncRequest(record events.DynamoDBEventRecord) (*dynamorm.AsyncReques
     // Use DynamORM's SafeMarshaler for proper conversion
     marshaler := marshal.NewSafeMarshaler()
     
-    var asyncReq dynamorm.AsyncRequest
+    var asyncReq models.AsyncRequest
     if err := marshaler.UnmarshalItem(image, &asyncReq); err != nil {
         return nil, fmt.Errorf("failed to unmarshal AsyncRequest using DynamORM marshaler: %w", err)
     }
@@ -250,7 +251,7 @@ func handler(ctx context.Context, event events.DynamoDBEvent) error {
             continue
         }
 
-        if asyncReq.Status != dynamorm.StatusPending {
+        if asyncReq.Status != models.StatusPending {
             continue
         }
 
