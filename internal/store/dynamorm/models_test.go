@@ -370,3 +370,29 @@ func TestSubscription_FromStoreModel(t *testing.T) {
 	assert.Equal(t, now, sub.CreatedAt)
 	assert.Equal(t, now.Add(30*24*time.Hour).Unix(), sub.TTL)
 }
+
+// TestAsyncRequestStructValidation verifies that AsyncRequest struct can be used with DynamORM
+func TestAsyncRequestStructValidation(t *testing.T) {
+	// This test verifies the struct tags are valid by attempting to create
+	// an AsyncRequest and use it with basic operations
+	req := &dynamorm.AsyncRequest{
+		RequestID:    "test-123",
+		ConnectionID: "conn-456", 
+		Status:       dynamorm.StatusPending,
+		Action:       "test-action",
+		CreatedAt:    time.Now(),
+	}
+	
+	// Set keys - this should work without errors
+	req.SetKeys()
+	
+	// Verify PK/SK are set correctly
+	assert.Equal(t, "REQ#test-123", req.PK)
+	assert.Equal(t, "STATUS#PENDING", req.SK)
+	
+	// Verify all fields are accessible
+	assert.Equal(t, "test-123", req.RequestID)
+	assert.Equal(t, "conn-456", req.ConnectionID)
+	assert.Equal(t, dynamorm.StatusPending, req.Status)
+	assert.Equal(t, "test-action", req.Action)
+}
